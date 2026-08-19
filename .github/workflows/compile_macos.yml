@@ -19,9 +19,9 @@ jobs:
           #tests, # includes px4_sitl
           ]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        token: ${{secrets.ACCESS_TOKEN}}
+        submodules: recursive
 
     - name: setup
       run: ./Tools/setup/macos.sh; ./Tools/setup/macos.sh

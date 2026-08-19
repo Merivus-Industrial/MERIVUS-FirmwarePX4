@@ -24,9 +24,9 @@ jobs:
       image: px4io/px4-dev-simulation-focal:2021-09-08
       options: --privileged --ulimit core=-1 --security-opt seccomp=unconfined
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.ACCESS_TOKEN }}
+        submodules: recursive
 
     - name: Download MAVSDK
       run: wget "https://github.com/mavlink/MAVSDK/releases/download/v$(cat test/mavsdk_tests/MAVSDK_VERSION)/libmavsdk-dev_$(cat test/mavsdk_tests/MAVSDK_VERSION)_ubuntu20.04_amd64.deb"
@@ -120,10 +120,6 @@ jobs:
     - name: Upload coverage
       if: contains(matrix.config.build_type, 'Coverage')
       run: |
-          git config --global credential.helper "" # disable the keychain credential helper
-          git config --global --add credential.helper store # enable the local store credential helper
-          echo "https://x-access-token:${{ secrets.ACCESS_TOKEN }}@github.com" >> ~/.git-credentials # add credential
-          git config --global url."https://github.com/".insteadof git@github.com: # credentials add credential
           mkdir -p coverage
           lcov --directory build/px4_sitl_default --base-directory build/px4_sitl_default --gcov-tool gcov --capture -o coverage/lcov.info
     - name: Upload coverage information to Codecov

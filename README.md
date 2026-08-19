@@ -11,7 +11,7 @@ MERIVUS 多无人机编队飞行固件，基于 **PX4 v1.14** 源码开发，当
 - 固件目标：`px4_fmu-v6c_default`；
 - 仿真目标：`px4_sitl_default`；
 - 编队模块：`swarm_node`；
-- 配套地面站：[Merivus-Industrial/MERIVUS](https://github.com/Merivus-Industrial/MERIVUS)；
+- 配套地面站：[Merivus-Industrial/MERIVUS-GroundStation](https://github.com/Merivus-Industrial/MERIVUS-GroundStation)；
 - 推荐构建环境：Ubuntu 22.04 或已有 PX4 v1.14 工具链的 Ubuntu 虚拟机；
 - Windows 用于源码编辑、版本管理和 QGroundControl 刷写，不作为本项目的原生 PX4 编译环境。
 
@@ -46,7 +46,7 @@ MERIVUS 多无人机编队飞行固件，基于 **PX4 v1.14** 源码开发，当
 ### 1. 在 Ubuntu 中获取源码
 
 ```bash
-git clone --recursive https://github.com/Merivus-Industrial/FirmwarePX4.git
+git clone --recursive https://github.com/Merivus-Industrial/MERIVUS-FirmwarePX4.git
 cd FirmwarePX4
 ```
 
@@ -81,6 +81,7 @@ build/px4_fmu-v6c_default/px4_fmu-v6c_default.px4
 完整的 Windows、Ubuntu 虚拟机、源码同步和刷写流程见：
 
 - [构建与刷写指南](Documentation/merivus/BUILD_AND_FLASH.md)
+- [持续集成与产物契约](Documentation/merivus/CI_CONTRACT.md)
 - [RTK 与 4G 数传配置契约](Documentation/merivus/RTK_AND_4G_CONFIGURATION.md)
 
 ## 推荐开发流程
@@ -88,7 +89,7 @@ build/px4_fmu-v6c_default/px4_fmu-v6c_default.px4
 ```text
 Windows 修改与提交源码
         ↓ push
-Merivus-Industrial/FirmwarePX4
+Merivus-Industrial/MERIVUS-FirmwarePX4
         ↓ pull
 Ubuntu 虚拟机编译
         ↓ 复制 .px4
