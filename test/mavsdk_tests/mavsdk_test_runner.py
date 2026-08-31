@@ -545,20 +545,26 @@ class Tester:
             "public": "true"
         }
 
-        with open(ulog_path, 'rb') as f:
-            r = requests.post(server + "/upload",
-                              data=payload,
-                              files={'filearg': f},
-                              allow_redirects=False)
-            if r.status_code == 302:  # redirect
-                if 'Location' in r.headers:
-                    plot_url = r.headers['Location']
-                    if len(plot_url) > 0 and plot_url[0] == '/':
-                        plot_url = server + plot_url
-                    print("    Uploaded to: " + plot_url)
-            else:
-                print("    Upload failed with status_code: {}"
-                      .format(r.status_code))
+        try:
+            with open(ulog_path, 'rb') as f:
+                r = requests.post(server + "/upload",
+                                  data=payload,
+                                  files={'filearg': f},
+                                  allow_redirects=False,
+                                  timeout=(10, 120))
+        except requests.RequestException as error:
+            print("    Upload failed: {}".format(error))
+            return
+
+        if r.status_code == 302:  # redirect
+            if 'Location' in r.headers:
+                plot_url = r.headers['Location']
+                if len(plot_url) > 0 and plot_url[0] == '/':
+                    plot_url = server + plot_url
+                print("    Uploaded to: " + plot_url)
+        else:
+            print("    Upload failed with status_code: {}"
+                  .format(r.status_code))
 
     def start_combined_log(self, filename: str) -> None:
         self.log_fd = open(filename, 'w')
