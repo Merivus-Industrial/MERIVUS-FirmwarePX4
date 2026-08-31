@@ -45,6 +45,11 @@ else
 	fi
 fi
 
+if ! command -v arm-none-eabi-gcc &> /dev/null
+then
+	brew install gcc-arm-none-eabi
+fi
+
 # Python dependencies
 echo "Installing PX4 Python3 dependencies"
 # We need to have future to install pymavlink later.
