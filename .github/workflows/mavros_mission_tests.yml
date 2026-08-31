@@ -15,82 +15,24 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - {vehicle: "iris",          mission: "MC_mission_box",  build_type: "RelWithDebInfo"}
-          - {vehicle: "rover",         mission: "rover_mission_1", build_type: "RelWithDebInfo"}
-          #- {vehicle: "plane",         mission: "FW_mission_1",    build_type: "RelWithDebInfo"}
-          #- {vehicle: "plane_catapult",mission: "FW_mission_1",    build_type: "RelWithDebInfo"}
-          #- {vehicle: "standard_vtol", mission: "VTOL_mission_1",  build_type: "Coverage"}
-          #- {vehicle: "standard_vtol", mission: "VTOL_mission_1",  build_type: "AddressSanitizer"}
-          #- {vehicle: "tailsitter",    mission: "VTOL_mission_1",  build_type: "RelWithDebInfo"}
-          #- {vehicle: "tiltrotor",     mission: "VTOL_mission_1",  build_type: "RelWithDebInfo"}
+          - {vehicle: "iris",  mission: "MC_mission_box",  build_type: "RelWithDebInfo"}
+          - {vehicle: "rover", mission: "rover_mission_1", build_type: "RelWithDebInfo"}
 
-    container:
-      image: px4io/px4-dev-ros-melodic:2021-09-08
-      options: --privileged --ulimit core=-1 --security-opt seccomp=unconfined
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
         fetch-depth: 0
 
-    - name: setup ccache
-      run: |
-          mkdir -p ~/.ccache
-          echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
-          echo "compression = true" >> ~/.ccache/ccache.conf
-          echo "compression_level = 6" >> ~/.ccache/ccache.conf
-          echo "max_size = 100M" >> ~/.ccache/ccache.conf
-          echo "hash_dir = false" >> ~/.ccache/ccache.conf
-          ccache -s
-          ccache -z
-
-    - name: check environment
-      run: |
-          export
-          ulimit -a
-    - name: Build PX4 and sitl_gazebo-classic
-      env:
-        PX4_CMAKE_BUILD_TYPE: ${{matrix.config.build_type}}
-      run: |
-        ccache -z
-        make px4_sitl_default
-        make px4_sitl_default sitl_gazebo-classic
-        ccache -s
-
-    - name: Core dump settings
-      run: |
-          ulimit -c unlimited
-          echo "`pwd`/%e.core" > /proc/sys/kernel/core_pattern
-
-    - name: Run SITL tests
-      env:
-        PX4_CMAKE_BUILD_TYPE: ${{matrix.config.build_type}}
-      run: |
-        export
-        ./test/rostest_px4_run.sh mavros_posix_test_mission.test mission:=${{matrix.config.mission}} vehicle:=${{matrix.config.vehicle}}
-      timeout-minutes: 45
-
-    - name: Look at core files
-      if: failure()
-      run: gdb build/px4_sitl_default/bin/px4 px4.core -ex "thread apply all bt" -ex "quit"
-    - name: ecl EKF analysis
-      if: always()
-      run: ./Tools/ecl_ekf/process_logdata_ekf.py ~/.ros/log/*/*.ulg || true
-
-    - name: Upload logs to flight review
-      if: always()
-      run: ./Tools/upload_log.py -q --description "${GITHUB_WORKFLOW} ${GITHUB_RUN_ID}" --feedback "${GITHUB_WORKFLOW} ${GITHUB_RUN_ID} ${GITHUB_REPOSITORY} ${GITHUB_REF}" --source CI ~/.ros/log/*/*.ulg
-
-    # Report test coverage
-    - name: Upload coverage
-      if: contains(matrix.config.build_type, 'Coverage')
-      run: |
-          mkdir -p coverage
-          lcov --directory build/px4_sitl_default --base-directory build/px4_sitl_default --gcov-tool gcov --capture -o coverage/lcov.info
-    - name: Upload coverage information to Codecov
-      if: contains(matrix.config.build_type, 'Coverage')
-      uses: codecov/codecov-action@v1
+    - name: Build PX4 and run MAVROS mission test
+      uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        flags: mavros_mission
-        file: coverage/lcov.info
+        image: px4io/px4-dev-ros-melodic:2021-09-08
+        options: --privileged --ulimit core=-1 --security-opt seccomp=unconfined -v ${{ github.workspace }}:/workspace
+        run: |
+          cd /workspace
+          git config --global --add safe.directory /workspace
+          export PX4_CMAKE_BUILD_TYPE=${{ matrix.config.build_type }}
+          make px4_sitl_default
+          make px4_sitl_default sitl_gazebo-classic
+          ./test/rostest_px4_run.sh mavros_posix_test_mission.test mission:=${{ matrix.config.mission }} vehicle:=${{ matrix.config.vehicle }}
