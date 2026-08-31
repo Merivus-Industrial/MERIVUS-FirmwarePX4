@@ -15,19 +15,16 @@ jobs:
     env:
       PX4_TARGET: px4_fmu-v6c
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
         fetch-depth: 0
 
     - name: Prepare ccache timestamp
       id: ccache_cache_timestamp
-      shell: cmake -P {0}
-      run: |
-        string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-        message("::set-output name=timestamp::${current_date}")
+      run: echo "timestamp=$(date -u +'%Y%m%d%H%M%S')" >> "$GITHUB_OUTPUT"
     - name: ccache cache files
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.ccache
         key: ${{ env.PX4_TARGET }}-ccache-${{ steps.ccache_cache_timestamp.outputs.timestamp }}
@@ -50,7 +47,7 @@ jobs:
       run: ccache -s
 
     - name: Upload FMUv6C package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: merivus-px4_fmu-v6c
         if-no-files-found: error

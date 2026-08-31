@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     container: px4io/px4-dev-base-focal:2021-09-08
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
           ./src/lib/version/get_git_tag_or_branch_version.sh build/px4_sitl_default > artifacts/source-version.txt
 
       - name: Upload firmware metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: merivus-firmware-metadata
           path: artifacts

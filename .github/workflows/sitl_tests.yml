@@ -24,7 +24,7 @@ jobs:
       image: px4io/px4-dev-simulation-focal:2021-09-08
       options: --privileged --ulimit core=-1 --security-opt seccomp=unconfined
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         submodules: recursive
         fetch-depth: 0
@@ -36,12 +36,9 @@ jobs:
 
     - name: Prepare ccache timestamp
       id: ccache_cache_timestamp
-      shell: cmake -P {0}
-      run: |
-        string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-        message("::set-output name=timestamp::${current_date}")
+      run: echo "timestamp=$(date -u +'%Y%m%d%H%M%S')" >> "$GITHUB_OUTPUT"
     - name: ccache cache files
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.ccache
         key: sitl_tests-${{matrix.config.build_type}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
@@ -105,14 +102,14 @@ jobs:
       run: gdb build/px4_sitl_default/bin/px4 px4.core -ex "thread apply all bt" -ex "quit"
     - name: Upload px4 coredump
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: coredump
         path: px4.core
 
     - name: Upload px4 binary
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: binary
         path: build/px4_sitl_default/bin/px4
