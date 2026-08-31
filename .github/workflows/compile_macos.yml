@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: macos-15-intel
+    env:
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
     strategy:
       matrix:
         config: [
