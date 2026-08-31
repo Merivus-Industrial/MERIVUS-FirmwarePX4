@@ -21,18 +21,16 @@ jobs:
           scumaker_pilotpi_default,
           ]
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v7
       with:
-        token: ${{secrets.ACCESS_TOKEN}}
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Prepare ccache timestamp
       id: ccache_cache_timestamp
-      shell: cmake -P {0}
-      run: |
-        string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-        message("::set-output name=timestamp::${current_date}")
+      run: echo "timestamp=$(date -u +'%Y%m%d%H%M%S')" >> "$GITHUB_OUTPUT"
     - name: ccache cache files
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.ccache
         key: ${{matrix.config}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}

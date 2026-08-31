@@ -1,131 +1,44 @@
-name: Metadata
+name: MERIVUS Firmware Metadata
 
 on:
   push:
     branches:
-    - 'main'
-    - 'release/*'
-    - 'pr-metadata-test'
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-
-  airframe:
+  metadata:
     runs-on: ubuntu-latest
     container: px4io/px4-dev-base-focal:2021-09-08
     steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - name: airframe metadata
-      run: |
-        make airframe_metadata
-        ./src/lib/version/get_git_tag_or_branch_version.sh build/px4_sitl_default >> $GITHUB_ENV
-        cd build/px4_sitl_default/docs
-      # TODO: deploy to userguide gitbook
+      - name: Generate firmware metadata
+        run: |
+          make airframe_metadata
+          make module_documentation
+          make parameters_metadata
+          make extract_events
+          ./Tools/uorb_graph/create.py --src-path src --exclude-path src/examples --exclude-path src/lib/parameters --merge-depends --file Tools/uorb_graph/graph_full
+          ./Tools/uorb_graph/create.py --src-path src --exclude-path src/examples --exclude-path src/lib/parameters --exclude-path src/modules/mavlink --merge-depends --file Tools/uorb_graph/graph_full_no_mavlink
 
-    - uses: jakejarvis/s3-sync-action@master
-      with:
-        args: --acl public-read
-      env:
-        AWS_S3_BUCKET: 'px4-travis'
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: 'us-west-1'
-        SOURCE_DIR: 'build/px4_sitl_default/docs/'
-        DEST_DIR: 'Firmware/${{ env.version }}/_general/'
+      - name: Collect metadata artifact
+        run: |
+          mkdir -p artifacts/docs artifacts/events artifacts/uorb
+          cp -a build/px4_sitl_default/docs/. artifacts/docs/
+          cp build/px4_sitl_default/events/all_events_full.json.xz artifacts/events/
+          cp Tools/uorb_graph/graph_full.json Tools/uorb_graph/graph_full_no_mavlink.json artifacts/uorb/
+          ./src/lib/version/get_git_tag_or_branch_version.sh build/px4_sitl_default > artifacts/source-version.txt
 
-  module:
-    runs-on: ubuntu-latest
-    container: px4io/px4-dev-base-focal:2021-09-08
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
-
-    - name: module documentation
-      run: |
-        make module_documentation
-        cd build/px4_sitl_default/docs
-        ls -ls *
-      # TODO: deploy to userguide gitbook and s3
-
-  parameter:
-    runs-on: ubuntu-latest
-    container: px4io/px4-dev-base-focal:2021-09-08
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
-
-    - name: parameter metadata
-      run: |
-        make parameters_metadata
-        ./src/lib/version/get_git_tag_or_branch_version.sh build/px4_sitl_default >> $GITHUB_ENV
-
-    - uses: jakejarvis/s3-sync-action@master
-      with:
-        args: --acl public-read
-      env:
-        AWS_S3_BUCKET: 'px4-travis'
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: 'us-west-1'
-        SOURCE_DIR: 'build/px4_sitl_default/docs/'
-        DEST_DIR: 'Firmware/${{ env.version }}/_general/'
-
-  events:
-    runs-on: ubuntu-latest
-    container: px4io/px4-dev-base-focal:2021-09-08
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
-
-    - name: events metadata
-      run: |
-        make extract_events
-        ./src/lib/version/get_git_tag_or_branch_version.sh build/px4_sitl_default >> $GITHUB_ENV
-        cd build/px4_sitl_default
-        mkdir _events_full || true
-        cp events/all_events_full.json.xz _events_full/all_events.json.xz
-
-    - uses: jakejarvis/s3-sync-action@master
-      with:
-        args: --acl public-read
-      env:
-        AWS_S3_BUCKET: 'px4-travis'
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: 'us-west-1'
-        SOURCE_DIR: 'build/px4_sitl_default/_events_full/'
-        DEST_DIR: 'Firmware/${{ env.version }}/_general/'
-
-  uorb_graph:
-    runs-on: ubuntu-latest
-    container: px4io/px4-dev-nuttx-focal:2021-09-08
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
-
-    - name: uORB graph
-      run: |
-        make uorb_graphs
-        cd Tools/uorb_graph
-        ls -ls *
-      # TODO: deploy graph_px4_sitl.json to S3 px4-travis:Firmware/master/
-
-  ROS2_msgs:
-    runs-on: ubuntu-latest
-    container: px4io/px4-dev-base-focal:2021-09-08
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        token: ${{ secrets.ACCESS_TOKEN }}
-
-    - name: PX4 ROS2 msgs
-      run: |
-        git clone https://github.com/PX4/px4_msgs.git
-        rm px4_msgs/msg/*.msg
-        cp msg/*.msg px4_msgs/msg/
+      - name: Upload firmware metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: merivus-firmware-metadata
+          path: artifacts
+          if-no-files-found: error
