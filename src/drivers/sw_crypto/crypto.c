@@ -149,13 +149,13 @@ static const uint8_t *crypto_get_key_ptr(keystore_session_handle_t handle, uint8
 }
 
 
-void crypto_init()
+void crypto_init(void)
 {
 	keystore_init();
 	clear_key_cache();
 }
 
-void crypto_deinit()
+void crypto_deinit(void)
 {
 }
 

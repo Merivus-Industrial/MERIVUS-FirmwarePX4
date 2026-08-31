@@ -53,7 +53,7 @@ __BEGIN_DECLS
  * Initialize the console buffer: register the CONSOLE_BUFFER_DEVICE
  * @return 0 on success, <0 error otherwise
  */
-int px4_console_buffer_init();
+int px4_console_buffer_init(void);
 
 /**
  * Print content of the console buffer to stdout
@@ -65,7 +65,7 @@ void px4_console_buffer_print(bool follow);
 /**
  * Get the current used buffer size
  */
-int px4_console_buffer_size();
+int px4_console_buffer_size(void);
 
 /**
  * Read (chunks) of the console buffer.
@@ -82,12 +82,12 @@ __END_DECLS
 
 #else
 
-static inline int px4_console_buffer_init()
+static inline int px4_console_buffer_init(void)
 {
 	return 0;
 }
 
-static inline int px4_console_buffer_size()
+static inline int px4_console_buffer_size(void)
 {
 	return 0;
 }
