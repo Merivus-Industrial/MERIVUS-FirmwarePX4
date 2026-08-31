@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -euo pipefail
+
 # script directory
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
@@ -47,7 +49,8 @@ fi
 
 if ! command -v arm-none-eabi-gcc &> /dev/null
 then
-	brew install gcc-arm-none-eabi
+	brew trust --formula px4/px4/gcc-arm-none-eabi
+	brew install px4/px4/gcc-arm-none-eabi
 fi
 
 # Python dependencies
