@@ -30,7 +30,10 @@ jobs:
         fetch-depth: 0
 
     - name: setup
-      run: ./Tools/setup/macos.sh; ./Tools/setup/macos.sh
+      run: ./Tools/setup/macos.sh
+
+    - name: install ccache
+      run: brew install ccache
 
     - name: Prepare ccache timestamp
       id: ccache_cache_timestamp
