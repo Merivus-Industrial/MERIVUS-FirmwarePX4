@@ -168,7 +168,7 @@ ControlAllocator::update_allocation_method(bool force)
 		AllocationMethod desired_methods[ActuatorEffectiveness::MAX_NUM_MATRICES];
 		_actuator_effectiveness->getDesiredAllocationMethod(desired_methods);
 
-		bool normalize_rpy[ActuatorEffectiveness::MAX_NUM_MATRICES];
+		bool normalize_rpy[ActuatorEffectiveness::MAX_NUM_MATRICES] {};
 		_actuator_effectiveness->getNormalizeRPY(normalize_rpy);
 
 		for (int i = 0; i < _num_control_allocation; ++i) {
@@ -306,6 +306,12 @@ ControlAllocator::Run()
 #endif
 
 	// Check if parameters have changed
+	if (_ftc_parameter_update_sub.updated()) {
+		parameter_update_s update{};
+		_ftc_parameter_update_sub.copy(&update);
+		_param_ftc_mon_en.update(); _param_ftc_ca_shadow.update(); _param_ftc_ca_en.update();
+	}
+
 	if (_parameter_update_sub.updated() && !_armed) {
 		// clear update
 		parameter_update_s param_update;
@@ -366,6 +372,7 @@ ControlAllocator::Run()
 	// Run allocator on torque changes
 	if (_vehicle_torque_setpoint_sub.update(&vehicle_torque_setpoint)) {
 		_torque_sp = matrix::Vector3f(vehicle_torque_setpoint.xyz);
+		_ftc_command_timestamp = vehicle_torque_setpoint.timestamp;
 
 		do_update = true;
 		_timestamp_sample = vehicle_torque_setpoint.timestamp_sample;
@@ -389,12 +396,19 @@ ControlAllocator::Run()
 		check_for_motor_failures();
 
 		update_effectiveness_matrix_if_needed(EffectivenessUpdateReason::NO_EXTERNAL_UPDATE);
+	}
+
+	const float ftc_dt = _ftc_last_update ? (now - _ftc_last_update) * 1e-6f : dt;
+	_ftc_last_update = now;
+	update_ftc_allocation(ftc_dt, now);
+
+	if (do_update) {
 
 		// Set control setpoint vector(s)
 		matrix::Vector<float, NUM_AXES> c[ActuatorEffectiveness::MAX_NUM_MATRICES];
 		c[0](0) = _torque_sp(0);
 		c[0](1) = _torque_sp(1);
-		c[0](2) = _torque_sp(2);
+		c[0](2) = _torque_sp(2) * _ftc_policy.yaw_weight;
 		c[0](3) = _thrust_sp(0);
 		c[0](4) = _thrust_sp(1);
 		c[0](5) = _thrust_sp(2);
@@ -469,6 +483,8 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 		ActuatorEffectiveness::ActuatorVector minimum[ActuatorEffectiveness::MAX_NUM_MATRICES];
 		ActuatorEffectiveness::ActuatorVector maximum[ActuatorEffectiveness::MAX_NUM_MATRICES];
 		ActuatorEffectiveness::ActuatorVector slew_rate[ActuatorEffectiveness::MAX_NUM_MATRICES];
+		bool normalize_rpy[ActuatorEffectiveness::MAX_NUM_MATRICES] {};
+		_actuator_effectiveness->getNormalizeRPY(normalize_rpy);
 		int actuator_idx = 0;
 		int actuator_idx_matrix[ActuatorEffectiveness::MAX_NUM_MATRICES] {};
 
@@ -575,11 +591,113 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 			int total_num_actuators = config.num_actuators_matrix[i];
 			_control_allocation[i]->setEffectivenessMatrix(config.effectiveness_matrices[i], config.trim[i],
 					config.linearization_point[i], total_num_actuators, reason == EffectivenessUpdateReason::CONFIGURATION_UPDATE);
+
+			if (_param_ftc_mon_en.get() || _param_ftc_ca_shadow.get() || _param_ftc_ca_en.get()) {
+				publish_ftc_effectiveness_matrix(i, config.effectiveness_matrices[i], config.trim[i],
+						config.linearization_point[i], minimum[i], maximum[i], total_num_actuators,
+						normalize_rpy[i]);
+			}
 		}
 
+		if (reason == EffectivenessUpdateReason::CONFIGURATION_UPDATE) { _ftc_policy.resetGeometry(); }
+		_ftc_nominal = config;
+		_ftc_nominal_valid = true;
 		trims.timestamp = hrt_absolute_time();
 		_actuator_servos_trim_pub.publish(trims);
 	}
+}
+
+void ControlAllocator::update_ftc_allocation(float dt, hrt_abstime now)
+{
+	ftc_model_status_s model{};
+	ftc_control_authority_s authority{};
+	_ftc_model_sub.copy(&model);
+	_ftc_authority_sub.copy(&authority);
+	FtcAllocationPolicy::Input input{};
+	input.now = now;
+	input.enabled = _param_ftc_mon_en.get() && _param_ftc_ca_en.get();
+	vehicle_status_s vehicle{};
+	_vehicle_status_sub.copy(&vehicle);
+	vehicle_land_detected_s land{};
+	_ftc_land_sub.copy(&land);
+	input.landed = land.landed || !FtcAllocationPolicy::fresh(now, land.timestamp, 1000000);
+	input.armed = _armed && FtcAllocationPolicy::fresh(now, vehicle.timestamp, 1000000)
+		&& !vehicle.failsafe && !vehicle.is_vtol && vehicle.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
+	input.supported = _ftc_nominal_valid && _num_control_allocation == 1
+		&& _effectiveness_source_id == EffectivenessSource::MULTIROTOR && _handled_motor_failure_bitmask == 0
+		&& _num_actuators[1] == 0 && _param_r_rev.get() == 0
+		&& (_allocation_method_id == AllocationMethod::SEQUENTIAL_DESATURATION || _allocation_method_id == AllocationMethod::AUTO);
+	input.count = _num_actuators[0];
+	input.model_timestamp = model.timestamp;
+	input.authority_timestamp = authority.timestamp;
+	input.model_valid = model.valid && model.motor_count == input.count && FtcAllocationPolicy::fresh(now, _ftc_command_timestamp, 200000);
+	input.authority_valid = authority.valid && authority.matrix_valid;
+	input.estimate_age = model.estimate_age;
+	input.reset_count = model.reset_count;
+	input.attitude_authority = authority.minimum_attitude_authority;
+	input.thrust_authority = authority.thrust_authority;
+	input.yaw_authority = authority.yaw_authority;
+	memcpy(input.lambda, model.motor_effectiveness, sizeof(input.lambda));
+	memcpy(input.uncertainty, model.estimate_uncertainty, sizeof(input.uncertainty));
+	const bool was_active = _ftc_policy.active;
+	_ftc_policy.update(dt, input);
+	if (_ftc_nominal_valid && _num_control_allocation == 1 && (_ftc_policy.active || was_active)) {
+		auto dynamic = _ftc_nominal.effectiveness_matrices[0];
+		for (int i = 0; i < _num_actuators[0] && i < MAX_NUM_MOTORS; ++i) {
+			for (int axis = 0; axis < NUM_AXES; ++axis) { dynamic(axis, i) *= _ftc_policy.lambda(i); }
+		}
+		_control_allocation[0]->setEffectivenessMatrix(dynamic, _ftc_nominal.trim[0],
+			_ftc_nominal.linearization_point[0], _ftc_nominal.num_actuators_matrix[0], false);
+	}
+	if (now - _ftc_last_status >= 20_ms) {
+		ftc_allocation_status_s status{};
+		status.timestamp = now;
+		status.model_timestamp = model.timestamp;
+		status.state = _ftc_policy.state;
+		status.enabled = input.enabled;
+		status.active = _ftc_policy.active;
+		status.supported = input.supported;
+		status.fallback_reason = _ftc_policy.reason;
+		status.yaw_weight = _ftc_policy.yaw_weight;
+		for (unsigned i = 0; i < 12; ++i) { status.applied_effectiveness[i] = _ftc_policy.lambda(i); }
+		_ftc_allocation_pub.publish(status);
+		_ftc_last_status = now;
+	}
+}
+
+void
+ControlAllocator::publish_ftc_effectiveness_matrix(int matrix_index,
+		const ActuatorEffectiveness::EffectivenessMatrix &effectiveness,
+		const ActuatorVector &trim, const ActuatorVector &linearization_point,
+		const ActuatorVector &minimum, const ActuatorVector &maximum, int num_actuators, bool normalize_rpy)
+{
+	if (matrix_index < 0 || matrix_index >= ActuatorEffectiveness::MAX_NUM_MATRICES) {
+		return;
+	}
+
+	ftc_effectiveness_matrix_s snapshot{};
+	snapshot.timestamp = hrt_absolute_time();
+	snapshot.matrix_index = static_cast<uint8_t>(matrix_index);
+	snapshot.num_axes = NUM_AXES;
+	snapshot.num_actuators = static_cast<uint8_t>(num_actuators < NUM_ACTUATORS ? num_actuators : NUM_ACTUATORS);
+	snapshot.num_motors = static_cast<uint8_t>(_num_actuators[(int)ActuatorType::MOTORS] < snapshot.num_actuators
+			      ? _num_actuators[(int)ActuatorType::MOTORS] : snapshot.num_actuators);
+	snapshot.valid = snapshot.num_actuators > 0;
+	snapshot.normalize_rpy = normalize_rpy;
+
+	for (int actuator = 0; actuator < snapshot.num_actuators; ++actuator) {
+		snapshot.trim[actuator] = trim(actuator);
+		snapshot.linearization_point[actuator] = linearization_point(actuator);
+		snapshot.minimum[actuator] = minimum(actuator);
+		snapshot.maximum[actuator] = maximum(actuator);
+
+		for (int axis = 0; axis < NUM_AXES; ++axis) {
+			snapshot.effectiveness[axis * ftc_effectiveness_matrix_s::NUM_ACTUATORS + actuator]
+				= effectiveness(axis, actuator);
+		}
+	}
+
+	_ftc_effectiveness_matrix_pub[matrix_index].publish(snapshot);
 }
 
 void

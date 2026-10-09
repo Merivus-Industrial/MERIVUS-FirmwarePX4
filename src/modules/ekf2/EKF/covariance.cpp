@@ -444,7 +444,8 @@ void Ekf::fixCovarianceErrors(bool force_symmetry)
 		bool bad_acc_bias = false;
 		if (fabsf(down_dvel_bias) > dVel_bias_lim) {
 
-			bool bad_vz_gps = _control_status.flags.gps    && (down_dvel_bias * _aid_src_gnss_vel.innovation[2] < 0.0f);
+			bool bad_vz_gps = _control_status.flags.gps && _gps_sample_delayed.vel_d_valid
+					&& (down_dvel_bias * _aid_src_gnss_vel.innovation[2] < 0.0f);
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 			bool bad_vz_ev  = _control_status.flags.ev_vel && (down_dvel_bias * _aid_src_ev_vel.innovation[2] < 0.0f);
 #else

@@ -1,0 +1,6 @@
+menuconfig MODULES_FTC_EXTREME_STATE_MONITOR
+	bool "ftc_extreme_state_monitor"
+	default n
+	depends on MODULES_MOTOR_HEALTH_MONITOR
+	---help---
+		Enable impact, hard-landing and loss-of-control observation

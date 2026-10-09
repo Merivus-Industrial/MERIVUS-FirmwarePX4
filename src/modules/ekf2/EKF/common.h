@@ -166,10 +166,11 @@ struct gpsMessage {
 	uint8_t     fix_type{};         ///< 0-1: no fix, 2: 2D fix, 3: 3D fix, 4: RTCM code differential, 5: Real-Time Kinematic
 	float       eph{};              ///< GPS horizontal position accuracy in m
 	float       epv{};              ///< GPS vertical position accuracy in m
-	float       sacc{};             ///< GPS speed accuracy in m/s
+	float       sacc{};             ///< GPS speed accuracy in m/s; zero means not reported, not perfect accuracy
 	float       vel_m_s{};          ///< GPS ground speed (m/sec)
 	Vector3f    vel_ned{};          ///< GPS ground speed NED
-	bool        vel_ned_valid{};    ///< GPS ground speed is valid
+	bool        vel_ned_valid{};    ///< Complete NED velocity is valid (also implies valid NE velocity)
+	bool        vel_ne_valid{};     ///< NE velocity is valid even when Down velocity is not available
 	uint8_t     nsats{};            ///< number of satellites used
 	float       pdop{};             ///< position dilution of precision
 };
@@ -188,10 +189,11 @@ struct gpsSample {
 	Vector2f    pos{};      ///< NE earth frame gps horizontal position measurement (m)
 	float       hgt{};      ///< gps height measurement (m)
 	Vector3f    vel{};      ///< NED earth frame gps velocity measurement (m/sec)
+	bool        vel_d_valid{}; ///< Down velocity is measured; false for horizontal-only GNSS velocity
 	float       yaw{};      ///< yaw angle. NaN if not set (used for dual antenna GPS), (rad, [-PI, PI])
 	float       hacc{};     ///< 1-std horizontal position error (m)
 	float       vacc{};     ///< 1-std vertical position error (m)
-	float       sacc{};     ///< 1-std speed error (m/sec)
+	float       sacc{};     ///< 1-std speed error (m/sec); zero means not reported
 	float       yaw_acc{};  ///< 1-std yaw error (rad)
 };
 

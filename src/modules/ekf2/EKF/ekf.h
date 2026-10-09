@@ -1015,6 +1015,10 @@ private:
 
 	// control fusion of GPS observations
 	void controlGpsFusion(const imuSample &imu_delayed);
+	void updateGpsVelocityAidSrcStatus(const gpsSample &gps_sample, const Vector3f &velocity_variance);
+	void fuseGpsVelocity(const gpsSample &gps_sample);
+	void resetGpsVelocityTo(const gpsSample &gps_sample, const Vector3f &velocity_variance);
+	float getGpsVelocityTestRatio() const;
 	bool shouldResetGpsFusion() const;
 	bool isYawFailure() const;
 

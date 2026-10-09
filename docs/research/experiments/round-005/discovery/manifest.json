@@ -1,0 +1,28 @@
+{
+  "candidate_sha256": "fdedda61eb85b7a31646cac47e0484c9bb2919874b29d6a4ba9a8ab5be81547e",
+  "git_head": "807392a0c2fe46e8385856a4d1606ea875b68c69",
+  "maximum_truth_frame_attempts": 3,
+  "mode_order_by_seed": {
+    "11": [
+      "active",
+      "off"
+    ],
+    "12": [
+      "off",
+      "active"
+    ]
+  },
+  "scripts_sha256": {
+    "candidate.py": "387e62630c337727774853e5eaa70d463b7cf8eb5a9481918a5afda4def8972b",
+    "cycle.py": "dff85272f8701299e39a11ffeae199bd1733411e0b53bd125ed5355f805d278e",
+    "evaluate.py": "9088a7ab97dcb08d6ff1138ff1b26e0313ee8c4db066d0333c5bc8266a465bf8",
+    "research.py": "ece6b70d6d429ac191122ffe98720354378ed8ad14c9f87c623f886619c2e043",
+    "run_sitl.py": "a392e3cc1ebb17a8ed33dca430460c32efb56bf8781765a45b2ce37cc662438a",
+    "shadow.py": "1e842e926bd2913ef8cbb86ecdffa6d2073fe7ea0ed0ecf552088d8a4eef544a",
+    "test_research.py": "4eac0134c50c468d68e00aa2b9fb969012d3d60981f19711b646fc2a40ed9ee8"
+  },
+  "seeds": [
+    11,
+    12
+  ]
+}

@@ -43,6 +43,7 @@
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_status.h>
+#include <px4_platform_common/defines.h>
 
 using namespace time_literals;
 
@@ -241,9 +242,17 @@ void CrsfRc::Run()
 				sensor_gps_s sensor_gps;
 
 				if (_vehicle_gps_position_sub.update(&sensor_gps)) {
+					const bool horizontal_velocity_valid = (sensor_gps.vel_ne_valid || sensor_gps.vel_ned_valid)
+								&& PX4_ISFINITE(sensor_gps.vel_m_s) && sensor_gps.vel_m_s >= 0.f
+								&& PX4_ISFINITE(sensor_gps.cog_rad);
+
+					if (!horizontal_velocity_valid || sensor_gps.vel_m_s * 36.f > UINT16_MAX) {
+						break;
+					}
+
 					int32_t latitude = sensor_gps.lat;
 					int32_t longitude = sensor_gps.lon;
-					uint16_t groundspeed = sensor_gps.vel_d_m_s / 3.6f * 10.f;
+					uint16_t groundspeed = static_cast<uint16_t>(sensor_gps.vel_m_s * 36.f);
 					uint16_t gps_heading = math::degrees(sensor_gps.cog_rad) * 100.f;
 					uint16_t altitude = sensor_gps.alt + 1000;
 					uint8_t num_satellites = sensor_gps.satellites_used;

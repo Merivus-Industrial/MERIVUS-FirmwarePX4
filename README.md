@@ -1,116 +1,69 @@
 # MERIVUS FirmwarePX4
 
-MERIVUS 多无人机编队飞行固件，基于 **PX4 v1.14** 源码开发，当前主要面向 **Holybro Pixhawk 6C Mini（FMUv6C）** 和 PX4 SITL。
+MERIVUS 是一个基于 PX4 v1.14 源码快照的多无人机飞控项目，主要面向 Holybro Pixhawk 6C Mini（FMUv6C/V6C22）和 PX4 SITL。仓库目前包含 FMUv6C 适配、Hyper982 GNSS/RTK 与 HyperLte 4G 配置、`swarm_node` 编队协议，以及默认关闭的极端环境/容错控制（FTC）研究链。
 
-> [!IMPORTANT]
-> 这是 `Merivus-Industrial` 维护的个人研发项目，不是 PX4 官方仓库，也不代表 PX4 官方发行版本。仓库以当前可开发源码快照重新初始化，未保留 PX4 上游 Git 提交历史；上游版权、第三方组件及许可证信息仍按原文件保留。
+> 本仓库不是 PX4 官方发行版。产品历史从源码快照重新初始化，未保留精确的上游基线提交；上游和第三方许可证仍按原文件执行。
 
-## 当前状态
+维护者：**[Ale-xl](https://github.com/Ale-xl)**。产品历史与作者归属见 [贡献指南](CONTRIBUTING.md)。
 
-- 阶段：研发与 Mock/SITL 验证；
-- 固件目标：`px4_fmu-v6c_default`；
-- 仿真目标：`px4_sitl_default`；
-- 编队模块：`swarm_node`；
-- 配套地面站：[Merivus-Industrial/MERIVUS-GroundStation](https://github.com/Merivus-Industrial/MERIVUS-GroundStation)；
-- 推荐构建环境：Ubuntu 22.04 或已有 PX4 v1.14 工具链的 Ubuntu 虚拟机；
-- Windows 用于源码编辑、版本管理和 QGroundControl 刷写，不作为本项目的原生 PX4 编译环境。
+## 当前边界
 
-当前源码尚未在本次仓库整理后完成真实飞机验证，不应直接视为可投入生产飞行的发布固件。
+- 产品固件目标：`px4_fmu-v6c_default`
+- 仿真目标：`px4_sitl_default`
+- 构建环境：Ubuntu 22.04，或已经配好 PX4 v1.14 工具链的 Ubuntu；Windows 负责编辑、Git、GitNexus 和 QGroundControl 刷写
+- 编队：协议版本 `2`，支持包含 UAV-1 的单机、双机和六机分阶段验证
+- FTC：已实现观察、Shadow、恢复候选以及默认关闭的主动分配/恢复路径；Active 状态为 `IMPLEMENTED_UNVERIFIED`
+- 验证状态：已有 Host、SITL、构建和遥测链路证据；Estimator 尚未稳定建立真实 SITL Baseline，未进入故障注入或 Active 验证
 
-## MERIVUS 定制内容
+## 系统概览
 
-### 分阶段编队协议
+```text
+Sensors -> EKF2 -> position/attitude/rate control -> Control Allocator -> ESC/motors
+   |                                                   |
+   +---------------- FTC observe/shadow ---------------+--> ULog
 
-`swarm_node` 与 MERIVUS 地面站实现版本化编队事务：
+Hyper982 -> GPS1/NMEA -> EKF2/MAVLink -> TELEM1/HyperLte -> GroundStation
 
-1. `PREPARE`：检查成员身份、位置、落地和解锁状态；
-2. `COMMIT`：进入 Offboard 准备、解锁并起飞到 Ready；
-3. `RELEASE`：所有成员 Ready 后开始实际编队轨迹；
-4. `ABORT`：任一阶段失败、超时或人工结束时退出到 Hold/Loiter。
+GroundStation -> MAVLink PREPARE/COMMIT/RELEASE/ABORT -> swarm_node
+              <- ACK/GPS/FOLLOW_TARGET session lease  -> Offboard setpoints
+```
 
-协议支持包含 UAV-1 的单机、双机和完整六机验证。详细参数、状态机、位置租约和失效保护见：
+完整模块、来源和数据流从 [MERIVUS 文档门户](docs/README.md) 进入：
 
-- [机载编队模块说明](src/modules/swarm_node/README.md)
-- [SwarmCommand 消息定义](msg/SwarmCommand.msg)
+- [系统地图](docs/architecture/SYSTEM_MAP.md)
+- [代码来源地图](docs/architecture/CODE_OWNERSHIP_MAP.md)
+- [关键数据流](docs/architecture/DATA_FLOWS.md)
+- [FTC 架构与真实接管边界](docs/extreme_control/FTC_ARCHITECTURE.md)
+- [当前模块状态](docs/PROJECT_STATUS.md)
 
-### 目标与板级配置
-
-- `boards/px4/fmu-v6c/default.px4board`：Pixhawk 6C Mini 编队固件；
-- `boards/px4/sitl/default.px4board`：SITL 编队验证；
-- `boards/hkust/`：HKUST NXT 系列板级配置；
-- `boards/micoair/`：MicoAir H743 系列板级配置；
-- `boards/holybro/durandal-v1/`：Durandal 定制配置。
-
-## 快速开始
-
-### 1. 在 Ubuntu 中获取源码
+## 快速构建
 
 ```bash
-git clone --recursive https://github.com/Merivus-Industrial/MERIVUS-FirmwarePX4.git
+git clone --recursive https://github.com/Ale-xl/MERIVUS-FirmwarePX4.git FirmwarePX4
 cd FirmwarePX4
-```
-
-如果已经克隆但缺少子模块：
-
-```bash
-git submodule sync --recursive
-git submodule update --init --recursive
-```
-
-### 2. 安装固件工具链
-
-已有可编译 PX4 v1.14 的 Ubuntu 虚拟机可以跳过此步。新环境建议使用 Ubuntu 22.04：
-
-```bash
-bash Tools/setup/ubuntu.sh --no-sim-tools
-source ~/.profile
-```
-
-### 3. 编译 Pixhawk 6C Mini
-
-```bash
 make px4_fmu-v6c_default
 ```
 
-成功后用于 QGroundControl 刷写的文件为：
+固件产物：
 
 ```text
 build/px4_fmu-v6c_default/px4_fmu-v6c_default.px4
 ```
 
-完整的 Windows、Ubuntu 虚拟机、源码同步和刷写流程见：
+首次环境准备、子模块、SHA-256、Windows/Ubuntu 分工和 QGroundControl 刷写见 [构建与刷写](docs/development/BUILD_AND_FLASH.md)。
 
-- [构建与刷写指南](Documentation/merivus/BUILD_AND_FLASH.md)
-- [持续集成与产物契约](Documentation/merivus/CI_CONTRACT.md)
-- [RTK 与 4G 数传配置契约](Documentation/merivus/RTK_AND_4G_CONFIGURATION.md)
+## 主要产品能力
 
-## 推荐开发流程
+- FMUv6C V6C22：BMI088 + ICM-42688-P、IST8310、MS5611 的板级识别和启动合同。
+- GNSS/通信：Hyper982 通过 GPS1 230400 8N1/NMEA 接入；HyperLte 通过 TELEM1 57600 8N1 透传 MAVLink Normal。
+- 编队：GroundStation 和 `swarm_node` 共同实现 PREPARE → COMMIT → RELEASE 事务，失败或超时进入 ABORT/Hold。
+- FTC：电机健康与模型观察、动态效能矩阵 shadow、剩余控制能力、impact/LOC、恢复候选和 Supervisor。
 
-```text
-Windows 修改与提交源码
-        ↓ push
-Merivus-Industrial/MERIVUS-FirmwarePX4
-        ↓ pull
-Ubuntu 虚拟机编译
-        ↓ 复制 .px4
-Windows QGroundControl 刷写
-```
+## 安全说明
 
-优先使用 Git 同步 Windows 与 Ubuntu 虚拟机，不要反复覆盖整个源码目录。编译应在 Ubuntu 的 Linux 文件系统内进行，不建议直接在 VMware 共享目录中构建。
+- `FTC_` 检测入口默认关闭；`FTC_CA_EN=0`、`FTC_REC_ACT=0`、`FTC_SIM_EN=0`。主动路径已有实现但未经闭环验证。
+- 编队 ABORT 请求 Hold/Loiter，不代表飞机已经安全降落。
+- 自定义固件首次上电和输出测试必须拆桨或采取等效防护；实机测试需要现场授权、急停和逐级验证。
+- 构建和部署必须记录主仓/子模块提交、工具链、构建目标及产物 SHA-256，不得在部署机直接改产物。
 
-## 安全边界
-
-- 默认只进行代码检查、Mock 和 SITL 验证；
-- 不自动连接或控制真实飞机；
-- `ABORT`/失效保护只请求 Hold/Loiter，不代表已经安全降落；
-- 首次实机测试必须拆桨或采取等效防护，并由现场人员完成检查、授权和急停准备；
-- 自定义固件刷写前应保存参数并确认飞控型号、bootloader 和固件目标一致。
-
-## 许可证与上游
-
-本项目继承 PX4 源码中的 BSD 3-Clause License，详见 [LICENSE](LICENSE)。各子模块和第三方组件可能采用各自许可证，请同时遵守对应目录或上游仓库中的许可要求。
-
-PX4 官方项目：
-
-- <https://github.com/PX4/PX4-Autopilot>
-- <https://px4.io/>
+配套地面站：[Ale-xl/MERIVUS-GroundStation](https://github.com/Ale-xl/MERIVUS-GroundStation)。许可证见 [LICENSE](LICENSE)。

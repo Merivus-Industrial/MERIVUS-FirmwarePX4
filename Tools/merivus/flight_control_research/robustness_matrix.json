@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "candidate_sha256": "fdedda61eb85b7a31646cac47e0484c9bb2919874b29d6a4ba9a8ab5be81547e",
+  "cases": [
+    {"id":"w02_px_g05","seed":31,"disturbance":"gust","magnitude_m_s":2,"direction":"1 0 0","duration_s":0.5},
+    {"id":"w04_nx_g1","seed":32,"disturbance":"gust","magnitude_m_s":4,"direction":"-1 0 0","duration_s":1},
+    {"id":"w06_py_g2","seed":33,"disturbance":"gust","magnitude_m_s":6,"direction":"0 1 0","duration_s":2},
+    {"id":"w08_ny_g5","seed":34,"disturbance":"gust","magnitude_m_s":8,"direction":"0 -1 0","duration_s":5},
+    {"id":"w10_45_g1","seed":35,"disturbance":"gust","magnitude_m_s":10,"direction":"0.70710678 0.70710678 0","duration_s":1},
+    {"id":"w12_135_g2","seed":36,"disturbance":"gust","magnitude_m_s":12,"direction":"-0.70710678 0.70710678 0","duration_s":2},
+    {"id":"nominal_iris_8","seed":56,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5},
+    {"id":"steady_px_8","seed":37,"disturbance":"wind","magnitude_m_s":8,"direction":"1 0 0"},
+    {"id":"steady_ny_12","seed":38,"disturbance":"wind","magnitude_m_s":12,"direction":"0 -1 0"},
+    {"id":"periodic_45_8","seed":39,"disturbance":"periodic","magnitude_m_s":8,"direction":"0.70710678 0.70710678 0","duration_s":1},
+    {"id":"random_135_8","seed":40,"disturbance":"randomized_gust","magnitude_m_s":8,"direction":"-0.70710678 0.70710678 0","duration_s":5},
+    {"id":"mass_m20","seed":41,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"mass_scale":0.8}},
+    {"id":"mass_m10","seed":42,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"mass_scale":0.9}},
+    {"id":"mass_p10","seed":43,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"mass_scale":1.1}},
+    {"id":"mass_p20","seed":44,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"mass_scale":1.2}},
+    {"id":"inertia_m20","seed":45,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"inertia_scale":0.8}},
+    {"id":"inertia_m10","seed":46,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"inertia_scale":0.9}},
+    {"id":"inertia_p10","seed":47,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"inertia_scale":1.1}},
+    {"id":"inertia_p20","seed":48,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"inertia_scale":1.2}},
+    {"id":"motor_delay_2x","seed":49,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"motor_delay_scale":2}},
+    {"id":"thrust_max_90pct","seed":50,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"airframe":{"max_rot_velocity_scale":0.9}},
+    {"id":"gps_pos_noise_2x","seed":51,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"sensor":{"gps_position_noise_scale":2}},
+    {"id":"gps_vel_noise_2x","seed":52,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"sensor":{"gps_velocity_noise_scale":2}},
+    {"id":"gps_fusion_delay_220ms","seed":53,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"px4_params":{"EKF2_GPS_DELAY":220}},
+    {"id":"imu_noise_2x","seed":54,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"sensor":{"imu_noise_scale":2}},
+    {"id":"imu_bias_2x","seed":55,"disturbance":"gust","magnitude_m_s":8,"direction":"1 0 0","duration_s":5,"sensor":{"imu_bias_scale":2}}
+  ]
+}

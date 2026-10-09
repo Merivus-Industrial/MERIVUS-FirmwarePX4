@@ -1,0 +1,6 @@
+menuconfig MODULES_FTC_RECOVERY
+	bool "ftc_recovery"
+	default n
+	depends on MODULES_FTC_EXTREME_STATE_MONITOR && MODULES_FTC_CONTROL_MONITOR
+	---help---
+		Enable the gated recovery manager and disconnected candidate controller

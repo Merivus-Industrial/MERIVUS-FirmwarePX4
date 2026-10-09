@@ -37,12 +37,50 @@ file(RELATIVE_PATH MAVLINK_GIT_DIR_RELATIVE ${CMAKE_SOURCE_DIR} ${MAVLINK_GIT_DI
 
 px4_add_git_submodule(TARGET git_mavlink_v2 PATH "${MAVLINK_GIT_DIR}")
 
+set(MAVLINK_PRIMARY_DEFINITION
+	"${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml")
+set(MAVLINK_PRIMARY_DEFINITION_DEPENDS ${MAVLINK_PRIMARY_DEFINITION})
+
+if(CONFIG_MAVLINK_DIALECT STREQUAL "merivus")
+	# Keep the pinned MAVLink submodule untouched. The product dialect is staged
+	# in the build tree alongside the upstream definitions it includes.
+	set(MAVLINK_DEFINITION_STAGE "${CMAKE_CURRENT_BINARY_DIR}/message_definitions/v1.0")
+	add_custom_command(
+		OUTPUT
+			"${MAVLINK_DEFINITION_STAGE}/merivus.xml"
+			"${MAVLINK_DEFINITION_STAGE}/merivus_ftc.xml"
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${MAVLINK_DEFINITION_STAGE}"
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+			"${MAVLINK_GIT_DIR}/message_definitions/v1.0" "${MAVLINK_DEFINITION_STAGE}"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${CMAKE_CURRENT_LIST_DIR}/message_definitions/v1.0/merivus.xml"
+			"${MAVLINK_DEFINITION_STAGE}/merivus.xml"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${CMAKE_CURRENT_LIST_DIR}/message_definitions/v1.0/merivus_ftc.xml"
+			"${MAVLINK_DEFINITION_STAGE}/merivus_ftc.xml"
+		DEPENDS
+			git_mavlink_v2
+			"${CMAKE_CURRENT_LIST_DIR}/message_definitions/v1.0/merivus.xml"
+			"${CMAKE_CURRENT_LIST_DIR}/message_definitions/v1.0/merivus_ftc.xml"
+		COMMENT "Staging MERIVUS MAVLink definitions without modifying the submodule"
+	)
+	set(MAVLINK_PRIMARY_DEFINITION "${MAVLINK_DEFINITION_STAGE}/merivus.xml")
+	set(MAVLINK_PRIMARY_DEFINITION_DEPENDS
+		"${MAVLINK_DEFINITION_STAGE}/merivus.xml"
+		"${MAVLINK_DEFINITION_STAGE}/merivus_ftc.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/development.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/common.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/standard.xml"
+		"${MAVLINK_GIT_DIR}/message_definitions/v1.0/minimal.xml")
+endif()
+
 # always generate uAvionix dialect
 set(MAVLINK_DIALECT_UAVIONIX "uAvionix")
 add_custom_command(
 	OUTPUT ${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h
 	COMMAND
-		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
+		${CMAKE_COMMAND} -E env PYTHONHASHSEED=0
+			${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			#--no-validate
 			#--strict-units
@@ -62,23 +100,24 @@ set_source_files_properties(${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/$
 add_custom_command(
 	OUTPUT ${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h
 	COMMAND
-		${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
+		${CMAKE_COMMAND} -E env PYTHONHASHSEED=0
+			${PYTHON_EXECUTABLE} ${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
 			--lang C --wire-protocol 2.0
 			#--no-validate
 			#--strict-units
 			--output ${MAVLINK_LIBRARY_DIR}
-			${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${CONFIG_MAVLINK_DIALECT}.log
+			${MAVLINK_PRIMARY_DEFINITION} > ${CMAKE_CURRENT_BINARY_DIR}/mavgen_${CONFIG_MAVLINK_DIALECT}.log
 	DEPENDS
 		git_mavlink_v2
 		${MAVLINK_GIT_DIR}/pymavlink/tools/mavgen.py
-		${MAVLINK_GIT_DIR}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml
+		${MAVLINK_PRIMARY_DEFINITION_DEPENDS}
 		${BOARD_DEFCONFIG}
 
 		# generate after uAvionix
 		mavlink_c_generate_uavionix
 		${MAVLINK_LIBRARY_DIR}/${MAVLINK_DIALECT_UAVIONIX}/${MAVLINK_DIALECT_UAVIONIX}.h
 
-	COMMENT "Generating Mavlink ${CONFIG_MAVLINK_DIALECT}: ${MAVLINK_GIT_DIR_RELATIVE}/message_definitions/v1.0/${CONFIG_MAVLINK_DIALECT}.xml"
+	COMMENT "Generating Mavlink ${CONFIG_MAVLINK_DIALECT}: ${MAVLINK_PRIMARY_DEFINITION}"
 )
 add_custom_target(mavlink_c_generate DEPENDS ${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h)
 set_source_files_properties(${MAVLINK_LIBRARY_DIR}/${CONFIG_MAVLINK_DIALECT}/${CONFIG_MAVLINK_DIALECT}.h PROPERTIES GENERATED true)

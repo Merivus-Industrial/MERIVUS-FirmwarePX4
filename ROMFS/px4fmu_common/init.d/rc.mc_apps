@@ -80,3 +80,13 @@ mc_pos_control start
 #
 land_detector start multicopter
 swarm_node start
+
+# Fault-tolerant enhancements are read-only and opt-in during the observation phase.
+if param compare FTC_MON_EN 1
+then
+	motor_health_monitor start
+	ftc_control_monitor start
+	ftc_extreme_state_monitor start
+	ftc_recovery start
+	ftc_supervisor start
+fi

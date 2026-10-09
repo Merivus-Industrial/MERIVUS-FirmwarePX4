@@ -1,37 +1,15 @@
-<!--
+## 问题与结果
 
-Thank you for your contribution!
+说明触发场景、原有问题以及变更后的行为。
 
-Get early feedback through
-- Dronecode Discord: https://discord.gg/dronecode
-- PX4 Discuss: http://discuss.px4.io/
-- opening a draft pr and sharing the link
+## 实现与来源边界
 
--->
+说明关键文件、职责、上游差异和关联任务；不修改无关模块。
 
-### Solved Problem
-When ... I found that ...
+## 验证
 
-Fixes #{Github issue ID}
+列出本次实际执行的检查、结果、未执行项及原因。区分静态、Host、SITL 和实机验证。
 
-### Solution
-- Add ... for ...
-- Refactor ...
+## 风险与回滚
 
-### Changelog Entry
-For release notes:
-```
-Feature/Bugfix XYZ
-New parameter: XYZ_Z
-Documentation: Need to clarify page ... / done, read docs.px4.io/...
-```
-
-### Alternatives
-We could also ...
-
-### Test coverage
-- Unit/integration test: ...
-- Simulation/hardware testing logs: https://review.px4.io/
-
-### Context
-Related links, screenshot before/after, video
+说明兼容性、安全边界及回滚方式；凭据、日志、模型和构建产物不得入库。

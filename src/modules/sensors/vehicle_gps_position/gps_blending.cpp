@@ -127,6 +127,7 @@ bool GpsBlending::blend_gps_data(uint64_t hrt_now_us)
 			_gps_state[i].fix_type = 0;
 			_gps_state[i].satellites_used = 0;
 			_gps_state[i].vel_ned_valid = 0;
+			_gps_state[i].vel_ne_valid = false;
 
 			if (i == _primary_instance) {
 				// Allow using a secondary instance when the primary
@@ -371,22 +372,43 @@ sensor_gps_s GpsBlending::gps_blend_states(float blend_weights[GPS_MAX_RECEIVERS
 	gps_blended_state.vel_n_m_s = 0;
 	gps_blended_state.vel_e_m_s = 0;
 	gps_blended_state.vel_d_m_s = 0;
+	gps_blended_state.vel_ne_valid = true;
+	gps_blended_state.vel_ned_valid = true;
+	bool speed_accuracy_known = true;
+	bool speed_accuracy_valid = true;
+	bool has_velocity_contributor = false;
 
 	// combine the the GPS states into a blended solution using the weights calculated in calc_blend_weights()
 	for (uint8_t i = 0; i < GPS_MAX_RECEIVERS_BLEND; i++) {
 		// Assume blended error magnitude, DOP and sat count is equal to the best value from contributing receivers
 		// If any receiver contributing has an invalid velocity, then report blended velocity as invalid
 		if (blend_weights[i] > 0.0f) {
+			has_velocity_contributor = true;
 
 			// blend the timing data
 			gps_blended_state.timestamp += (uint64_t)((double)_gps_state[i].timestamp * (double)blend_weights[i]);
 			gps_blended_state.timestamp_sample += (uint64_t)((double)_gps_state[i].timestamp_sample * (double)blend_weights[i]);
 
-			// calculate a blended average speed and velocity vector
-			gps_blended_state.vel_m_s += _gps_state[i].vel_m_s * blend_weights[i];
-			gps_blended_state.vel_n_m_s += _gps_state[i].vel_n_m_s * blend_weights[i];
-			gps_blended_state.vel_e_m_s += _gps_state[i].vel_e_m_s * blend_weights[i];
-			gps_blended_state.vel_d_m_s += _gps_state[i].vel_d_m_s * blend_weights[i];
+			// Every contributing receiver must support the advertised dimensions.
+			// A horizontal-only source must never create a valid blended Down speed.
+			const bool ne_valid = (_gps_state[i].vel_ne_valid || _gps_state[i].vel_ned_valid)
+					      && PX4_ISFINITE(_gps_state[i].vel_m_s) && _gps_state[i].vel_m_s >= 0.f
+					      && PX4_ISFINITE(_gps_state[i].vel_n_m_s) && PX4_ISFINITE(_gps_state[i].vel_e_m_s);
+			const bool ned_valid = _gps_state[i].vel_ned_valid && ne_valid && PX4_ISFINITE(_gps_state[i].vel_d_m_s);
+			gps_blended_state.vel_ne_valid &= ne_valid;
+			gps_blended_state.vel_ned_valid &= ned_valid;
+			speed_accuracy_known &= PX4_ISFINITE(_gps_state[i].s_variance_m_s) && _gps_state[i].s_variance_m_s > 0.f;
+			speed_accuracy_valid &= PX4_ISFINITE(_gps_state[i].s_variance_m_s) && _gps_state[i].s_variance_m_s >= 0.f;
+
+			if (ne_valid) {
+				gps_blended_state.vel_m_s += _gps_state[i].vel_m_s * blend_weights[i];
+				gps_blended_state.vel_n_m_s += _gps_state[i].vel_n_m_s * blend_weights[i];
+				gps_blended_state.vel_e_m_s += _gps_state[i].vel_e_m_s * blend_weights[i];
+			}
+
+			if (ned_valid) {
+				gps_blended_state.vel_d_m_s += _gps_state[i].vel_d_m_s * blend_weights[i];
+			}
 
 
 			// use the lowest value
@@ -425,15 +447,27 @@ sensor_gps_s GpsBlending::gps_blend_states(float blend_weights[GPS_MAX_RECEIVERS
 				gps_blended_state.satellites_used = _gps_state[i].satellites_used;
 			}
 
-			if (_gps_state[i].vel_ned_valid) {
-				gps_blended_state.vel_ned_valid = true;
-			}
 		}
 
 		// TODO read parameters for individual GPS antenna positions and blend
 		// Vector3f temp_antenna_offset = _antenna_offset[i];
 		// temp_antenna_offset *= blend_weights[i];
 		// _blended_antenna_offset += temp_antenna_offset;
+	}
+
+	if (!has_velocity_contributor || !speed_accuracy_valid) {
+		// Malformed accuracy must not become an otherwise valid unknown-accuracy velocity.
+		gps_blended_state.vel_ne_valid = false;
+		gps_blended_state.vel_ned_valid = false;
+	}
+
+	if (!gps_blended_state.vel_ned_valid) {
+		gps_blended_state.vel_d_m_s = 0.f; // placeholder only; consumers must check vel_ned_valid
+	}
+
+	if (!speed_accuracy_known) {
+		// Do not inherit a known accuracy from just one contributor.
+		gps_blended_state.s_variance_m_s = 0.f;
 	}
 
 	/*

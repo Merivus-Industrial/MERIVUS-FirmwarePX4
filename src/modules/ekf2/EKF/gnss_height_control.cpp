@@ -115,7 +115,8 @@ void Ekf::controlGnssHeightFusion(const gpsSample &gps_sample)
 					bias_est.setBias(_state.pos(2) + measurement);
 
 					// reset vertical velocity
-					if (PX4_ISFINITE(gps_sample.vel(2)) && (_params.gnss_ctrl & GnssCtrl::VEL)) {
+					if (gps_sample.vel_d_valid && PX4_ISFINITE(gps_sample.vel(2))
+					    && (_params.gnss_ctrl & GnssCtrl::VEL)) {
 						// use 1.5 as a typical ratio of vacc/hacc
 						resetVerticalVelocityTo(gps_sample.vel(2), sq(math::max(1.5f * gps_sample.sacc, _params.gps_vel_noise)));
 

@@ -33,6 +33,7 @@
 
 #include "crsf_telemetry.h"
 #include <lib/rc/crsf.h>
+#include <px4_platform_common/defines.h>
 
 CRSFTelemetry::CRSFTelemetry(int uart_fd) :
 	_uart_fd(uart_fd)
@@ -96,9 +97,17 @@ bool CRSFTelemetry::send_gps()
 		return false;
 	}
 
+	const bool horizontal_velocity_valid = (vehicle_gps_position.vel_ne_valid || vehicle_gps_position.vel_ned_valid)
+					&& PX4_ISFINITE(vehicle_gps_position.vel_m_s) && vehicle_gps_position.vel_m_s >= 0.f
+					&& PX4_ISFINITE(vehicle_gps_position.cog_rad);
+
+	if (!horizontal_velocity_valid || vehicle_gps_position.vel_m_s * 36.f > UINT16_MAX) {
+		return false;
+	}
+
 	int32_t latitude = vehicle_gps_position.lat;
 	int32_t longitude = vehicle_gps_position.lon;
-	uint16_t groundspeed = vehicle_gps_position.vel_d_m_s / 3.6f * 10.f;
+	uint16_t groundspeed = static_cast<uint16_t>(vehicle_gps_position.vel_m_s * 36.f);
 	uint16_t gps_heading = math::degrees(vehicle_gps_position.cog_rad) * 100.f;
 	uint16_t altitude = vehicle_gps_position.alt + 1000;
 	uint8_t num_satellites = vehicle_gps_position.satellites_used;

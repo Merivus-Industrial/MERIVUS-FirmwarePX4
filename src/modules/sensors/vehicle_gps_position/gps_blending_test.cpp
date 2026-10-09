@@ -51,6 +51,7 @@ public:
 	sensor_gps_s getDefaultGpsData();
 	void runSeconds(float duration_s, GpsBlending &gps_blending, sensor_gps_s &gps_data, int instance);
 	void runSeconds(float duration_s, GpsBlending &gps_blending, sensor_gps_s &gps_data0, sensor_gps_s &gps_data1);
+	sensor_gps_s blendUsingPositionAccuracy(const sensor_gps_s &gps_data0, const sensor_gps_s &gps_data1);
 
 	uint64_t _time_now_us{1000000};
 };
@@ -274,4 +275,129 @@ TEST_F(GpsBlendingTest, dualReceiverFailover)
 	// THEN: the primary receiver should be used again
 	EXPECT_EQ(gps_blending.getSelectedGps(), 0);
 	EXPECT_TRUE(gps_blending.isNewOutputDataAvailable());
+}
+
+sensor_gps_s GpsBlendingTest::blendUsingPositionAccuracy(const sensor_gps_s &gps_data0,
+		const sensor_gps_s &gps_data1)
+{
+	GpsBlending gps_blending;
+	// Position-based weights keep both receivers in the blend even when one
+	// receiver cannot report speed accuracy.
+	gps_blending.setBlendingUseHPosAccuracy(true);
+	gps_blending.setGpsData(gps_data0, 0);
+	gps_blending.setGpsData(gps_data1, 1);
+	gps_blending.update(_time_now_us);
+	EXPECT_EQ(gps_blending.getSelectedGps(), 2);
+	EXPECT_TRUE(gps_blending.isNewOutputDataAvailable());
+	return gps_blending.getOutputGpsData();
+}
+
+TEST_F(GpsBlendingTest, horizontalOnlyReceiverKeepsDimensionFlagsWithoutBlending)
+{
+	GpsBlending gps_blending;
+	sensor_gps_s gps = getDefaultGpsData();
+	gps.vel_ne_valid = true;
+	gps.vel_ned_valid = false;
+	gps.vel_d_m_s = 0.f;
+	gps_blending.setGpsData(gps, 0);
+	gps_blending.update(_time_now_us);
+	ASSERT_TRUE(gps_blending.isNewOutputDataAvailable());
+	EXPECT_TRUE(gps_blending.getOutputGpsData().vel_ne_valid);
+	EXPECT_FALSE(gps_blending.getOutputGpsData().vel_ned_valid);
+	EXPECT_FLOAT_EQ(gps_blending.getOutputGpsData().vel_n_m_s, gps.vel_n_m_s);
+}
+
+TEST_F(GpsBlendingTest, legacyThreeDimensionalSourcesBlendAllAxes)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	ASSERT_FALSE(gps0.vel_ne_valid); // Old producers set only vel_ned_valid.
+	gps0.vel_d_m_s = -2.f;
+	gps1.vel_d_m_s = -4.f;
+	gps1.vel_n_m_s = 3.f;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_TRUE(output.vel_ne_valid);
+	EXPECT_TRUE(output.vel_ned_valid);
+	EXPECT_NEAR(output.vel_n_m_s, 2.f, 1e-6f);
+	EXPECT_NEAR(output.vel_d_m_s, -3.f, 1e-6f);
+}
+
+TEST_F(GpsBlendingTest, mixedTwoAndThreeDimensionalSourcesNeverInventDownVelocity)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	gps0.vel_ne_valid = true;
+	gps0.vel_ned_valid = false;
+	gps0.vel_d_m_s = 75.f; // Ignored storage value, not an observation.
+	gps1.vel_n_m_s = 3.f;
+	gps1.vel_d_m_s = -4.f;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_TRUE(output.vel_ne_valid);
+	EXPECT_FALSE(output.vel_ned_valid);
+	EXPECT_NEAR(output.vel_n_m_s, 2.f, 1e-6f);
+	EXPECT_FLOAT_EQ(output.vel_d_m_s, 0.f);
+	EXPECT_FLOAT_EQ(output.s_variance_m_s, 0.2f);
+}
+
+TEST_F(GpsBlendingTest, twoHorizontalOnlySourcesKeepHorizontalValidity)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	gps0.vel_ne_valid = gps1.vel_ne_valid = true;
+	gps0.vel_ned_valid = gps1.vel_ned_valid = false;
+	gps0.vel_d_m_s = 75.f;
+	gps1.vel_d_m_s = -75.f;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_TRUE(output.vel_ne_valid);
+	EXPECT_FALSE(output.vel_ned_valid);
+	EXPECT_FLOAT_EQ(output.vel_d_m_s, 0.f);
+}
+
+TEST_F(GpsBlendingTest, unknownContributorAccuracyCannotInheritKnownAccuracy)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	gps0.eph *= 0.5f; // Known-accuracy receiver is the highest-weight reference.
+	gps1.s_variance_m_s = 0.f;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_TRUE(output.vel_ne_valid);
+	EXPECT_TRUE(output.vel_ned_valid);
+	EXPECT_FLOAT_EQ(output.s_variance_m_s, 0.f);
+}
+
+TEST_F(GpsBlendingTest, malformedContributorAccuracyInvalidatesVelocity)
+{
+	const float invalid_accuracies[] {-0.1f, NAN, INFINITY};
+
+	for (unsigned index = 0; index < 3; ++index) {
+		SCOPED_TRACE(index);
+		sensor_gps_s gps0 = getDefaultGpsData();
+		sensor_gps_s gps1 = getDefaultGpsData();
+		gps1.s_variance_m_s = invalid_accuracies[index];
+		const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+		EXPECT_FALSE(output.vel_ne_valid);
+		EXPECT_FALSE(output.vel_ned_valid);
+		EXPECT_FLOAT_EQ(output.vel_d_m_s, 0.f);
+		EXPECT_GE(output.fix_type, 3); // Invalid velocity must not fabricate loss of position fix.
+	}
+}
+
+TEST_F(GpsBlendingTest, oneInvalidHorizontalContributorInvalidatesTheBlendedVelocity)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	gps1.vel_n_m_s = NAN;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_FALSE(output.vel_ne_valid);
+	EXPECT_FALSE(output.vel_ned_valid);
+}
+
+TEST_F(GpsBlendingTest, invalidGroundSpeedInvalidatesTheBlendedVelocity)
+{
+	sensor_gps_s gps0 = getDefaultGpsData();
+	sensor_gps_s gps1 = getDefaultGpsData();
+	gps1.vel_m_s = NAN;
+	const sensor_gps_s output = blendUsingPositionAccuracy(gps0, gps1);
+	EXPECT_FALSE(output.vel_ne_valid);
+	EXPECT_FALSE(output.vel_ned_valid);
 }

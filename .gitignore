@@ -106,5 +106,17 @@ src/systemcmds/topic_listener/listener_generated.cpp
 
 !src/drivers/distance_sensor/broadcom/afbrs50/Lib/*
 
+# Local GitNexus knowledge graph and parser caches
+/.gitnexus/
+
 # colcon
 log/
+
+# Local credentials and validation artifacts
+.env
+.env.*
+!.env.example
+*.ulg
+*.ulog
+/artifacts/
+/.pytest_cache/

@@ -1,0 +1,5 @@
+menuconfig MODULES_MOTOR_HEALTH_MONITOR
+	bool "motor_health_monitor"
+	default n
+	---help---
+		Enable the read-only motor effectiveness and health monitor

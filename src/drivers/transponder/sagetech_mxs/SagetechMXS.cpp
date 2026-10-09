@@ -754,22 +754,25 @@ void SagetechMXS::send_operating_msg()
 		_adsb_ident.commit();
 	}
 
-	if (_gps.vel_ned_valid) {
+	const bool horizontal_velocity_valid = (_gps.vel_ne_valid || _gps.vel_ned_valid)
+					&& PX4_ISFINITE(_gps.vel_n_m_s) && PX4_ISFINITE(_gps.vel_e_m_s)
+					&& PX4_ISFINITE(_gps.vel_m_s) && _gps.vel_m_s >= 0.f && PX4_ISFINITE(_gps.cog_rad);
+	const bool vertical_velocity_valid = _gps.vel_ned_valid && PX4_ISFINITE(_gps.vel_d_m_s);
+
+	if (vertical_velocity_valid) {
 		mxs_state.op.climbValid = true;
 		mxs_state.op.climbRate = _gps.vel_d_m_s * SAGETECH_SCALE_M_PER_SEC_TO_FT_PER_MIN;
-		mxs_state.op.airspdValid = true;
-		mxs_state.op.headingValid = true;
 
 	} else {
 		// PX4_WARN("send_operating_msg: Invalid NED");
 		mxs_state.op.climbValid = false;
 		mxs_state.op.climbRate = -CLIMB_RATE_LIMIT;
-		mxs_state.op.airspdValid = false;
-		mxs_state.op.headingValid = false;
 	}
 
-	const uint16_t speed_knots = _gps.vel_m_s * SAGETECH_SCALE_M_PER_SEC_TO_KNOTS;
-	double heading = (double) math::degrees(matrix::wrap_2pi(_gps.cog_rad));
+	mxs_state.op.airspdValid = horizontal_velocity_valid;
+	mxs_state.op.headingValid = horizontal_velocity_valid;
+	const uint16_t speed_knots = horizontal_velocity_valid ? _gps.vel_m_s * SAGETECH_SCALE_M_PER_SEC_TO_KNOTS : 0;
+	double heading = horizontal_velocity_valid ? (double) math::degrees(matrix::wrap_2pi(_gps.cog_rad)) : 0.;
 	mxs_state.op.airspd = speed_knots;
 	mxs_state.op.heading = heading;
 
@@ -789,7 +792,7 @@ void SagetechMXS::send_gps_msg()
 	gps.vfom = _gps.epv >= 0 ? _gps.epv : 0;
 	gps.nacv = sg_nacv_t::nacvUnknown;
 
-	if (_gps.s_variance_m_s >= (float)10.0 || _gps.s_variance_m_s < 0) {
+	if (!PX4_ISFINITE(_gps.s_variance_m_s) || _gps.s_variance_m_s <= 0.f || _gps.s_variance_m_s >= 10.f) {
 		gps.nacv = sg_nacv_t::nacvUnknown;
 
 	} else if (_gps.s_variance_m_s >= (float)3.0) {
@@ -1288,22 +1291,25 @@ void SagetechMXS::auto_config_operating()
 
 	mxs_state.op.identOn = false;
 
-	if (_gps.vel_ned_valid) {
+	const bool horizontal_velocity_valid = (_gps.vel_ne_valid || _gps.vel_ned_valid)
+					&& PX4_ISFINITE(_gps.vel_n_m_s) && PX4_ISFINITE(_gps.vel_e_m_s)
+					&& PX4_ISFINITE(_gps.vel_m_s) && _gps.vel_m_s >= 0.f && PX4_ISFINITE(_gps.cog_rad);
+	const bool vertical_velocity_valid = _gps.vel_ned_valid && PX4_ISFINITE(_gps.vel_d_m_s);
+
+	if (vertical_velocity_valid) {
 		mxs_state.op.climbValid = true;
 		mxs_state.op.climbRate = _gps.vel_d_m_s * SAGETECH_SCALE_M_PER_SEC_TO_FT_PER_MIN;
-		mxs_state.op.airspdValid = true;
-		mxs_state.op.headingValid = true;
 
 	} else {
 		// PX4_WARN("send_operating_msg: Invalid NED");
 		mxs_state.op.climbValid = false;
 		mxs_state.op.climbRate = -CLIMB_RATE_LIMIT;
-		mxs_state.op.airspdValid = false;
-		mxs_state.op.headingValid = false;
 	}
 
-	const uint16_t speed_knots = _gps.vel_m_s * SAGETECH_SCALE_M_PER_SEC_TO_KNOTS;
-	double heading = (double) math::degrees(matrix::wrap_2pi(_gps.cog_rad));
+	mxs_state.op.airspdValid = horizontal_velocity_valid;
+	mxs_state.op.headingValid = horizontal_velocity_valid;
+	const uint16_t speed_knots = horizontal_velocity_valid ? _gps.vel_m_s * SAGETECH_SCALE_M_PER_SEC_TO_KNOTS : 0;
+	double heading = horizontal_velocity_valid ? (double) math::degrees(matrix::wrap_2pi(_gps.cog_rad)) : 0.;
 	mxs_state.op.airspd = speed_knots;
 	mxs_state.op.heading = heading;
 

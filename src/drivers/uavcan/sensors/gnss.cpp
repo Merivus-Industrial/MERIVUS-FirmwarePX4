@@ -355,8 +355,15 @@ void UavcanGnssBridge::process_fixx(const uavcan::ReceivedDataStructure<FixType>
 		report.epv = -1.0F;
 	}
 
-	if (valid_vel_cov) {
-		report.s_variance_m_s = math::max(vel_cov[0], vel_cov[4], vel_cov[8]);
+	const bool horizontal_vel_cov_valid = PX4_ISFINITE(vel_cov[0]) && PX4_ISFINITE(vel_cov[4])
+					    && vel_cov[0] >= 0.f && vel_cov[4] >= 0.f;
+	const bool down_vel_cov_valid = fix_type < 3 || (PX4_ISFINITE(vel_cov[8]) && vel_cov[8] >= 0.f);
+
+	if (valid_vel_cov && horizontal_vel_cov_valid && down_vel_cov_valid) {
+		const float speed_variance = fix_type >= 3
+					 ? math::max(vel_cov[0], vel_cov[4], vel_cov[8])
+					 : math::max(vel_cov[0], vel_cov[4]);
+		report.s_variance_m_s = speed_variance > 0.f ? sqrtf(speed_variance) : 0.f;
 
 		/* There is a nonlinear relationship between the velocity vector and the heading.
 		 * Use Jacobian to transform velocity covariance to heading covariance
@@ -372,10 +379,11 @@ void UavcanGnssBridge::process_fixx(const uavcan::ReceivedDataStructure<FixType>
 		float vel_e = msg.ned_velocity[1];
 		float vel_n_sq = vel_n * vel_n;
 		float vel_e_sq = vel_e * vel_e;
-		report.c_variance_rad =
-			(vel_e_sq * vel_cov[0] +
-			 -2 * vel_n * vel_e * vel_cov[1] +	// Covariance matrix is symmetric
-			 vel_n_sq * vel_cov[4]) / ((vel_n_sq + vel_e_sq) * (vel_n_sq + vel_e_sq));
+		const float horizontal_speed_squared = vel_n_sq + vel_e_sq;
+		report.c_variance_rad = horizontal_speed_squared > 1e-6f && PX4_ISFINITE(vel_cov[1])
+			? (vel_e_sq * vel_cov[0] - 2.f * vel_n * vel_e * vel_cov[1] + vel_n_sq * vel_cov[4])
+			  / (horizontal_speed_squared * horizontal_speed_squared)
+			: -1.f;
 
 	} else {
 		report.s_variance_m_s = -1.0F;
@@ -387,11 +395,16 @@ void UavcanGnssBridge::process_fixx(const uavcan::ReceivedDataStructure<FixType>
 	report.vel_n_m_s = msg.ned_velocity[0];
 	report.vel_e_m_s = msg.ned_velocity[1];
 	report.vel_d_m_s = msg.ned_velocity[2];
-	report.vel_m_s = sqrtf(report.vel_n_m_s * report.vel_n_m_s +
-			       report.vel_e_m_s * report.vel_e_m_s +
-			       report.vel_d_m_s * report.vel_d_m_s);
+	report.vel_ne_valid = report.fix_type >= 2 && PX4_ISFINITE(report.vel_n_m_s)
+			      && PX4_ISFINITE(report.vel_e_m_s);
+	report.vel_ned_valid = report.fix_type >= 3 && report.vel_ne_valid && PX4_ISFINITE(report.vel_d_m_s);
+	report.vel_m_s = report.vel_ne_valid ? sqrtf(report.vel_n_m_s * report.vel_n_m_s +
+			       report.vel_e_m_s * report.vel_e_m_s) : NAN;
 	report.cog_rad = atan2f(report.vel_e_m_s, report.vel_n_m_s);
-	report.vel_ned_valid = true;
+
+	if (!report.vel_ned_valid) {
+		report.vel_d_m_s = 0.f;
+	}
 
 	report.timestamp_time_relative = 0;
 

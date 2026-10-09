@@ -72,6 +72,9 @@ else()
 	list(APPEND module_list ${external_module_paths})
 endif()
 
+# Shared FTC gates are referenced by core modules on boards without the
+# optional motor-health monitor, so their definitions must be scanned globally.
+list(APPEND module_list ${CMAKE_CURRENT_SOURCE_DIR})
 list(REMOVE_DUPLICATES module_list)
 
 set(generated_params_dir ${PX4_BINARY_DIR}/generated_params)

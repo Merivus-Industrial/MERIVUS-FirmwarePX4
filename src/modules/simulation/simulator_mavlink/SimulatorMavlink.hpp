@@ -62,6 +62,7 @@
 #include <uORB/topics/input_rc.h>
 #include <uORB/topics/esc_status.h>
 #include <uORB/topics/esc_report.h>
+#include <uORB/topics/ftc_simulation_status.h>
 #include <uORB/topics/irlock_report.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/parameter_update.h>
@@ -196,6 +197,7 @@ private:
 	uORB::PublicationMulti<sensor_optical_flow_s>	_sensor_optical_flow_pub{ORB_ID(sensor_optical_flow)};
 	uORB::Publication<irlock_report_s>		_irlock_report_pub{ORB_ID(irlock_report)};
 	uORB::Publication<esc_status_s>			_esc_status_pub{ORB_ID(esc_status)};
+	uORB::Publication<ftc_simulation_status_s>	_ftc_simulation_status_pub{ORB_ID(ftc_simulation_status)};
 	uORB::Publication<vehicle_odometry_s>		_visual_odometry_pub{ORB_ID(vehicle_visual_odometry)};
 	uORB::Publication<vehicle_odometry_s>		_mocap_odometry_pub{ORB_ID(vehicle_mocap_odometry)};
 
@@ -305,6 +307,9 @@ private:
 	float _last_baro_temperature{0.0f};
 
 	int32_t _output_functions[actuator_outputs_s::NUM_ACTUATOR_OUTPUTS] {};
+	float _sim_effectiveness{1.f};
+	hrt_abstime _sim_effectiveness_update{0};
+	int32_t _sim_motor_index{-1};
 
 #if defined(ENABLE_LOCKSTEP_SCHEDULER)
 	px4::atomic<bool> _has_initialized {false};
@@ -315,6 +320,11 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::MAV_TYPE>) _param_mav_type,
 		(ParamInt<px4::params::MAV_SYS_ID>) _param_mav_sys_id,
-		(ParamInt<px4::params::MAV_COMP_ID>) _param_mav_comp_id
+		(ParamInt<px4::params::MAV_COMP_ID>) _param_mav_comp_id,
+		(ParamBool<px4::params::FTC_SIM_EN>) _param_ftc_sim_en,
+		(ParamInt<px4::params::FTC_SIM_MOT>) _param_ftc_sim_mot,
+		(ParamFloat<px4::params::FTC_SIM_EFF>) _param_ftc_sim_eff,
+		(ParamFloat<px4::params::FTC_SIM_RAMP>) _param_ftc_sim_ramp,
+		(ParamFloat<px4::params::FTC_SIM_INT>) _param_ftc_sim_int
 	)
 };

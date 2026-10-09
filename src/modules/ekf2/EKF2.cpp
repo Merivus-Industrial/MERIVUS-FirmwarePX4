@@ -2262,6 +2262,7 @@ void EKF2::UpdateGpsSample(ekf2_timestamps_s &ekf2_timestamps)
 				vehicle_gps_position.vel_d_m_s
 			},
 			.vel_ned_valid = vehicle_gps_position.vel_ned_valid,
+			.vel_ne_valid = vehicle_gps_position.vel_ne_valid,
 			.nsats = vehicle_gps_position.satellites_used,
 			.pdop = sqrtf(vehicle_gps_position.hdop *vehicle_gps_position.hdop
 				      + vehicle_gps_position.vdop * vehicle_gps_position.vdop),

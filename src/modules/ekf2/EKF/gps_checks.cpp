@@ -158,8 +158,25 @@ bool Ekf::gps_is_good(const gpsMessage &gps)
 	_gps_check_fail_status.flags.hacc = (gps.eph > _params.req_hacc);
 	_gps_check_fail_status.flags.vacc = (gps.epv > _params.req_vacc);
 
-	// Check the reported speed accuracy
-	_gps_check_fail_status.flags.sacc = (gps.sacc > _params.req_sacc);
+	// Zero is the legacy "not reported" value. Keep the configured velocity-noise
+	// floor for that case; do not confuse malformed accuracy with missing accuracy.
+	const bool speed_accuracy_valid = PX4_ISFINITE(gps.sacc) && gps.sacc >= 0.f;
+	_gps_check_fail_status.flags.sacc = !speed_accuracy_valid || (gps.sacc > _params.req_sacc);
+
+	const bool horizontal_velocity_valid = (gps.vel_ned_valid || gps.vel_ne_valid)
+			&& Vector2f(gps.vel_ned.xy()).isAllFinite();
+	const bool vertical_velocity_valid = !gps.vel_ned_valid || PX4_ISFINITE(gps.vel_ned(2));
+
+	if (!horizontal_velocity_valid || !vertical_velocity_valid || !speed_accuracy_valid) {
+		// Bad numeric data is never made acceptable by disabling a statistical check.
+		_gps_check_fail_status.flags.hspeed = !horizontal_velocity_valid;
+		_gps_check_fail_status.flags.vspeed = !vertical_velocity_valid;
+		_gps_error_norm = INFINITY;
+		_last_gps_fail_us = _time_delayed_us;
+		resetGpsDriftCheckFilters();
+		_gps_velD_diff_filt = 0.f;
+		return false;
+	}
 
 	// check if GPS quality is degraded
 	_gps_error_norm = fmaxf((gps.eph / _params.req_hacc), (gps.epv / _params.req_vacc));
@@ -231,11 +248,18 @@ bool Ekf::gps_is_good(const gpsMessage &gps)
 	_gps_pos_prev.initReference(lat, lon, gps.time_usec);
 	_gps_alt_prev = 1e-3f * (float)gps.alt;
 
-	// Check  the filtered difference between GPS and EKF vertical velocity
-	const float vz_diff_limit = 10.0f * _params.req_vdrift;
-	const float vertVel = math::constrain(gps.vel_ned(2) - _state.vel(2), -vz_diff_limit, vz_diff_limit);
-	_gps_velD_diff_filt = vertVel * filter_coef + _gps_velD_diff_filt * (1.0f - filter_coef);
-	_gps_check_fail_status.flags.vspeed = (fabsf(_gps_velD_diff_filt) > _params.req_vdrift);
+	// Check the filtered difference only when Down velocity was actually measured.
+	// Horizontal-only NMEA data must not be interpreted as zero vertical speed.
+	if (gps.vel_ned_valid) {
+		const float vz_diff_limit = 10.0f * _params.req_vdrift;
+		const float vertVel = math::constrain(gps.vel_ned(2) - _state.vel(2), -vz_diff_limit, vz_diff_limit);
+		_gps_velD_diff_filt = vertVel * filter_coef + _gps_velD_diff_filt * (1.0f - filter_coef);
+		_gps_check_fail_status.flags.vspeed = (fabsf(_gps_velD_diff_filt) > _params.req_vdrift);
+
+	} else {
+		_gps_velD_diff_filt = 0.f;
+		_gps_check_fail_status.flags.vspeed = false;
+	}
 
 	// assume failed first time through
 	if (_last_gps_fail_us == 0) {

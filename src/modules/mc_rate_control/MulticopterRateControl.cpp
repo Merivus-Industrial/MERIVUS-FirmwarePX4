@@ -32,6 +32,7 @@
  ****************************************************************************/
 
 #include "MulticopterRateControl.hpp"
+#include "RateControlIntegrator.hpp"
 
 #include <drivers/drv_hrt.h>
 #include <circuit_breaker/circuit_breaker.h>
@@ -133,6 +134,7 @@ MulticopterRateControl::Run()
 		const Vector3f angular_accel{angular_velocity.xyz_derivative};
 
 		/* check for updates in other topics */
+		_actuator_armed_sub.update(&_actuator_armed);
 		_vehicle_control_mode_sub.update(&_vehicle_control_mode);
 
 		if (_vehicle_land_detected_sub.updated()) {
@@ -145,6 +147,9 @@ MulticopterRateControl::Run()
 		}
 
 		_vehicle_status_sub.update(&_vehicle_status);
+
+		const bool inhibit_integral = prepareRateControlIntegrator(_rate_control, hrt_absolute_time(),
+				_actuator_armed, _vehicle_control_mode, _vehicle_status, _maybe_landed, _landed);
 
 		// use rates setpoint topic
 		vehicle_rates_setpoint_s vehicle_rates_setpoint{};
@@ -186,11 +191,6 @@ MulticopterRateControl::Run()
 		// run the rate controller
 		if (_vehicle_control_mode.flag_control_rates_enabled) {
 
-			// reset integral if disarmed
-			if (!_vehicle_control_mode.flag_armed || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-				_rate_control.resetIntegral();
-			}
-
 			// update saturation status from control allocation feedback
 			control_allocator_status_s control_allocator_status;
 
@@ -213,8 +213,11 @@ MulticopterRateControl::Run()
 				_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
 			}
 
-			// run rate controller
-			const Vector3f att_control = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			Vector3f selected_rates = _rates_setpoint;
+			Vector3f selected_thrust = _thrust_setpoint;
+			_ftc_input.select(hrt_absolute_time(), dt, vehicle_rates_setpoint.timestamp, _vehicle_status,
+				_vehicle_control_mode, _landed, selected_rates, selected_thrust);
+			const Vector3f att_control = _rate_control.update(rates, selected_rates, angular_accel, dt, inhibit_integral);
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
@@ -226,7 +229,7 @@ MulticopterRateControl::Run()
 			vehicle_thrust_setpoint_s vehicle_thrust_setpoint{};
 			vehicle_torque_setpoint_s vehicle_torque_setpoint{};
 
-			_thrust_setpoint.copyTo(vehicle_thrust_setpoint.xyz);
+			selected_thrust.copyTo(vehicle_thrust_setpoint.xyz);
 			vehicle_torque_setpoint.xyz[0] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.f;
 			vehicle_torque_setpoint.xyz[1] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.f;
 			vehicle_torque_setpoint.xyz[2] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.f;

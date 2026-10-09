@@ -1,0 +1,239 @@
+<?xml version="1.0"?>
+<mavlink>
+  <version>3</version>
+  <dialect>0</dialect>
+  <enums>
+    <enum name="MERIVUS_FTC_SYSTEM_STATE">
+      <description>Aggregated MERIVUS fault-tolerant-control subsystem state.</description>
+      <entry value="0" name="MERIVUS_FTC_SYSTEM_STATE_DISABLED"/>
+      <entry value="1" name="MERIVUS_FTC_SYSTEM_STATE_NORMAL"/>
+      <entry value="2" name="MERIVUS_FTC_SYSTEM_STATE_DEGRADED"/>
+      <entry value="3" name="MERIVUS_FTC_SYSTEM_STATE_FAULT_CONFIRMED"/>
+      <entry value="4" name="MERIVUS_FTC_SYSTEM_STATE_RECOVERY_READY"/>
+      <entry value="5" name="MERIVUS_FTC_SYSTEM_STATE_RECOVERY_ACTIVE"/>
+      <entry value="6" name="MERIVUS_FTC_SYSTEM_STATE_EMERGENCY_LAND"/>
+      <entry value="7" name="MERIVUS_FTC_SYSTEM_STATE_FAILED"/>
+      <entry value="8" name="MERIVUS_FTC_SYSTEM_STATE_INITIALIZING"/>
+      <entry value="9" name="MERIVUS_FTC_SYSTEM_STATE_CALIBRATING"/>
+      <entry value="10" name="MERIVUS_FTC_SYSTEM_STATE_READY"/>
+      <entry value="11" name="MERIVUS_FTC_SYSTEM_STATE_UNOBSERVABLE"/>
+      <entry value="12" name="MERIVUS_FTC_SYSTEM_STATE_SHADOW"/>
+      <entry value="13" name="MERIVUS_FTC_SYSTEM_STATE_RECOVERY_CANDIDATE"/>
+      <entry value="14" name="MERIVUS_FTC_SYSTEM_STATE_ACTIVE_ALLOCATION"/>
+    </enum>
+    <enum name="MERIVUS_FTC_MONITOR_STATE">
+      <description>Motor-health observer state.</description>
+      <entry value="0" name="MERIVUS_FTC_MONITOR_STATE_DISABLED"/>
+      <entry value="1" name="MERIVUS_FTC_MONITOR_STATE_CALIBRATING"/>
+      <entry value="2" name="MERIVUS_FTC_MONITOR_STATE_VALID"/>
+      <entry value="3" name="MERIVUS_FTC_MONITOR_STATE_INVALID"/>
+    </enum>
+    <enum name="MERIVUS_FTC_FAULT_TYPE">
+      <description>Observed propulsion fault classification. This is a diagnostic classification, not proof of component lifetime.</description>
+      <entry value="0" name="MERIVUS_FTC_FAULT_NONE"/>
+      <entry value="1" name="MERIVUS_FTC_FAULT_UNKNOWN_PROPULSION_DEGRADATION"/>
+      <entry value="2" name="MERIVUS_FTC_FAULT_PROP_DAMAGE"/>
+      <entry value="3" name="MERIVUS_FTC_FAULT_MOTOR_DEGRADATION"/>
+      <entry value="4" name="MERIVUS_FTC_FAULT_MOTOR_STOP"/>
+      <entry value="5" name="MERIVUS_FTC_FAULT_ESC_OR_POWER_FAILURE"/>
+      <entry value="6" name="MERIVUS_FTC_FAULT_INTERMITTENT_PROPULSION_FAILURE"/>
+      <entry value="7" name="MERIVUS_FTC_FAULT_MECHANICAL_IMBALANCE"/>
+      <entry value="8" name="MERIVUS_FTC_FAULT_EXTERNAL_DISTURBANCE"/>
+      <entry value="9" name="MERIVUS_FTC_FAULT_MODEL_MISMATCH"/>
+    </enum>
+    <enum name="MERIVUS_FTC_AUTHORITY_STATE">
+      <description>Remaining control-authority classification.</description>
+      <entry value="0" name="MERIVUS_FTC_AUTHORITY_STATE_FULL_CONTROL"/>
+      <entry value="1" name="MERIVUS_FTC_AUTHORITY_STATE_DEGRADED_CONTROL"/>
+      <entry value="2" name="MERIVUS_FTC_AUTHORITY_STATE_YAW_UNCONTROLLABLE"/>
+      <entry value="3" name="MERIVUS_FTC_AUTHORITY_STATE_ATTITUDE_DEGRADED"/>
+      <entry value="4" name="MERIVUS_FTC_AUTHORITY_STATE_THRUST_INSUFFICIENT"/>
+      <entry value="5" name="MERIVUS_FTC_AUTHORITY_STATE_RECOVERY_ONLY"/>
+      <entry value="6" name="MERIVUS_FTC_AUTHORITY_STATE_UNCONTROLLABLE"/>
+    </enum>
+    <enum name="MERIVUS_FTC_CONTROL_MODE">
+      <description>Highest FTC integration stage currently represented by the data path. ACTIVE requires an explicitly connected actuator command path.</description>
+      <entry value="0" name="MERIVUS_FTC_CONTROL_MODE_DISABLED"/>
+      <entry value="1" name="MERIVUS_FTC_CONTROL_MODE_OBSERVE"/>
+      <entry value="2" name="MERIVUS_FTC_CONTROL_MODE_SHADOW"/>
+      <entry value="3" name="MERIVUS_FTC_CONTROL_MODE_CANDIDATE"/>
+      <entry value="4" name="MERIVUS_FTC_CONTROL_MODE_ACTIVE"/>
+    </enum>
+    <enum name="MERIVUS_FTC_IMPACT_TYPE">
+      <description>Observed impact classification.</description>
+      <entry value="0" name="MERIVUS_FTC_IMPACT_TYPE_NONE"/>
+      <entry value="1" name="MERIVUS_FTC_IMPACT_TYPE_EXTERNAL"/>
+      <entry value="2" name="MERIVUS_FTC_IMPACT_TYPE_HARD_LANDING"/>
+    </enum>
+    <enum name="MERIVUS_FTC_LOC_STATE">
+      <description>Observed loss-of-control state.</description>
+      <entry value="0" name="MERIVUS_FTC_LOC_STATE_NORMAL"/>
+      <entry value="1" name="MERIVUS_FTC_LOC_STATE_DISTURBED"/>
+      <entry value="2" name="MERIVUS_FTC_LOC_STATE_RECOVERY_RECOMMENDED"/>
+      <entry value="3" name="MERIVUS_FTC_LOC_STATE_LOSS_OF_CONTROL"/>
+      <entry value="4" name="MERIVUS_FTC_LOC_STATE_UNRECOVERABLE"/>
+    </enum>
+    <enum name="MERIVUS_FTC_RECOVERY_STATE">
+      <description>Disconnected recovery-candidate state machine state.</description>
+      <entry value="0" name="MERIVUS_FTC_RECOVERY_STATE_DISABLED"/>
+      <entry value="1" name="MERIVUS_FTC_RECOVERY_STATE_MONITORING"/>
+      <entry value="2" name="MERIVUS_FTC_RECOVERY_STATE_DISTURBANCE_DETECTED"/>
+      <entry value="3" name="MERIVUS_FTC_RECOVERY_STATE_RATE_DAMPING"/>
+      <entry value="4" name="MERIVUS_FTC_RECOVERY_STATE_THRUST_VECTOR_RECOVERY"/>
+      <entry value="5" name="MERIVUS_FTC_RECOVERY_STATE_ATTITUDE_RECOVERY"/>
+      <entry value="6" name="MERIVUS_FTC_RECOVERY_STATE_ALTITUDE_STABILIZATION"/>
+      <entry value="7" name="MERIVUS_FTC_RECOVERY_STATE_CONTROL_REENTRY"/>
+      <entry value="8" name="MERIVUS_FTC_RECOVERY_STATE_EMERGENCY_LAND"/>
+      <entry value="9" name="MERIVUS_FTC_RECOVERY_STATE_ABORTED"/>
+      <entry value="10" name="MERIVUS_FTC_RECOVERY_STATE_FAILED"/>
+      <entry value="11" name="MERIVUS_FTC_RECOVERY_STATE_VERTICAL_SPEED_RECOVERY"/>
+    </enum>
+    <enum name="MERIVUS_FTC_MOTOR_FLAGS" bitmask="true">
+      <description>Validity and source flags for MERIVUS_FTC_MOTOR_STATUS.</description>
+      <entry value="1" name="MERIVUS_FTC_MOTOR_FLAGS_MONITOR_ENABLED"/>
+      <entry value="2" name="MERIVUS_FTC_MOTOR_FLAGS_MODEL_VALID"/>
+      <entry value="4" name="MERIVUS_FTC_MOTOR_FLAGS_ESC_DATA_AVAILABLE"/>
+      <entry value="8" name="MERIVUS_FTC_MOTOR_FLAGS_IMU_ONLY"/>
+    </enum>
+    <enum name="MERIVUS_FTC_CONTROL_FLAGS" bitmask="true">
+      <description>Validity and integration flags for MERIVUS_FTC_CONTROL_STATUS.</description>
+      <entry value="1" name="MERIVUS_FTC_CONTROL_FLAGS_MONITOR_ENABLED"/>
+      <entry value="2" name="MERIVUS_FTC_CONTROL_FLAGS_AUTHORITY_VALID"/>
+      <entry value="4" name="MERIVUS_FTC_CONTROL_FLAGS_MATRIX_VALID"/>
+      <entry value="8" name="MERIVUS_FTC_CONTROL_FLAGS_SHADOW_VALID"/>
+      <entry value="16" name="MERIVUS_FTC_CONTROL_FLAGS_YAW_SACRIFICED"/>
+      <entry value="32" name="MERIVUS_FTC_CONTROL_FLAGS_RECOVERY_ELIGIBLE"/>
+      <entry value="64" name="MERIVUS_FTC_CONTROL_FLAGS_RECOVERY_CANDIDATE_VALID"/>
+      <entry value="128" name="MERIVUS_FTC_CONTROL_FLAGS_ACTIVE_COMMAND_PATH"/>
+    </enum>
+    <enum name="MERIVUS_FTC_EXTREME_FLAGS" bitmask="true">
+      <description>Validity and event flags for MERIVUS_FTC_EXTREME_STATUS.</description>
+      <entry value="1" name="MERIVUS_FTC_EXTREME_FLAGS_VALID"/>
+      <entry value="2" name="MERIVUS_FTC_EXTREME_FLAGS_IMPACT_DETECTED"/>
+      <entry value="4" name="MERIVUS_FTC_EXTREME_FLAGS_HARD_LANDING"/>
+      <entry value="8" name="MERIVUS_FTC_EXTREME_FLAGS_RECOVERY_ELIGIBLE"/>
+      <entry value="16" name="MERIVUS_FTC_EXTREME_FLAGS_INTERVENTION_ENABLED"/>
+      <entry value="32" name="MERIVUS_FTC_EXTREME_FLAGS_RECOVERY_CANDIDATE_VALID"/>
+      <entry value="64" name="MERIVUS_FTC_EXTREME_FLAGS_RECOVERY_STATE_ACTIVE"/>
+    </enum>
+    <enum name="MERIVUS_FTC_DIAGNOSTIC_FLAGS" bitmask="true">
+      <description>Validity and SITL injection flags for MERIVUS_FTC_DIAGNOSTICS.</description>
+      <entry value="1" name="MERIVUS_FTC_DIAGNOSTIC_FLAGS_MODEL_VALID"/>
+      <entry value="2" name="MERIVUS_FTC_DIAGNOSTIC_FLAGS_SHADOW_VALID"/>
+      <entry value="4" name="MERIVUS_FTC_DIAGNOSTIC_FLAGS_EXTREME_VALID"/>
+      <entry value="8" name="MERIVUS_FTC_DIAGNOSTIC_FLAGS_SIMULATION_ENABLED"/>
+      <entry value="16" name="MERIVUS_FTC_DIAGNOSTIC_FLAGS_SIMULATION_INTERMITTENT"/>
+    </enum>
+  </enums>
+  <messages>
+    <message id="60000" name="MERIVUS_FTC_MOTOR_STATUS">
+      <description>Compact per-motor FTC observer output for operator interfaces. Percentage arrays use 0..200 for 0..100 percent in 0.5 percent steps; 255 means unavailable.</description>
+      <field type="uint64_t" name="time_usec" units="us">PX4 monotonic publication timestamp.</field>
+      <field type="uint16_t" name="degraded_mask">Bit i is set when motor i is degraded.</field>
+      <field type="uint16_t" name="failed_mask">Bit i is set when motor i is failed.</field>
+      <field type="uint8_t[12]" name="health_pct">Observed health score. This is not remaining life.</field>
+      <field type="uint8_t[12]" name="effectiveness_pct">Observed relative actuator effectiveness.</field>
+      <field type="uint8_t[12]" name="fault_probability_pct">Observed fault probability.</field>
+      <field type="uint8_t[12]" name="confidence_pct">Observer confidence.</field>
+      <field type="uint8_t[12]" name="fault_type" enum="MERIVUS_FTC_FAULT_TYPE">Observed fault classification.</field>
+      <field type="uint8_t" name="protocol_version">MERIVUS FTC telemetry contract version.</field>
+      <field type="uint8_t" name="system_state" enum="MERIVUS_FTC_SYSTEM_STATE">Aggregated subsystem state.</field>
+      <field type="uint8_t" name="monitor_state" enum="MERIVUS_FTC_MONITOR_STATE">Motor-health observer state.</field>
+      <field type="uint8_t" name="motor_count">Number of valid motor entries, maximum 12.</field>
+      <field type="uint8_t" name="flags" enum="MERIVUS_FTC_MOTOR_FLAGS">Validity and source flags.</field>
+      <field type="uint8_t" name="model_quality_pct">Rigid-body model quality using the percentage scaling above.</field>
+      <extensions/>
+      <field type="uint64_t" name="last_valid_timestamp">Last accepted valid parameter update timestamp in microseconds.</field>
+      <field type="float" name="estimate_age">Seconds since last parameter update; infinity before first update.</field>
+      <field type="float[12]" name="estimate_uncertainty">One sigma relative-effectiveness uncertainty.</field>
+      <field type="uint8_t[12]" name="diagnosis_state">0 no evidence, 1 unknown, 2 unobservable, 3 valid healthy, 4 degraded, 5 failed.</field>
+      <field type="uint8_t" name="estimator_state">0 uninitialized, 1 calibrating, 2 baseline learned, 3 observable, 4 temporarily unobservable, 5 valid, 6 stale, 7 invalid.</field>
+      <field type="uint8_t" name="baseline_learned">Healthy baseline was learned this session.</field>
+      <field type="uint8_t" name="current_observable">Current aligned sample supplies independent information.</field>
+    </message>
+    <message id="60001" name="MERIVUS_FTC_CONTROL_STATUS">
+      <description>Control-authority and integration-stage summary. Percentage fields use 0..200 for 0..100 percent in 0.5 percent steps; 255 means unavailable.</description>
+      <field type="uint64_t" name="time_usec" units="us">PX4 monotonic publication timestamp.</field>
+      <field type="uint16_t" name="saturated_mask">Actuator saturation bit mask.</field>
+      <field type="uint8_t" name="protocol_version">MERIVUS FTC telemetry contract version.</field>
+      <field type="uint8_t" name="system_state" enum="MERIVUS_FTC_SYSTEM_STATE">Aggregated subsystem state.</field>
+      <field type="uint8_t" name="authority_state" enum="MERIVUS_FTC_AUTHORITY_STATE">Remaining control-authority state.</field>
+      <field type="uint8_t" name="control_mode" enum="MERIVUS_FTC_CONTROL_MODE">Highest represented integration stage.</field>
+      <field type="uint8_t" name="recovery_state" enum="MERIVUS_FTC_RECOVERY_STATE">Recovery-candidate state.</field>
+      <field type="uint8_t" name="flags" enum="MERIVUS_FTC_CONTROL_FLAGS">Validity and integration flags.</field>
+      <field type="uint8_t" name="roll_authority_pct">Remaining roll authority.</field>
+      <field type="uint8_t" name="pitch_authority_pct">Remaining pitch authority.</field>
+      <field type="uint8_t" name="yaw_authority_pct">Remaining yaw authority.</field>
+      <field type="uint8_t" name="thrust_authority_pct">Remaining thrust authority.</field>
+      <field type="uint8_t" name="minimum_attitude_authority_pct">Minimum attitude-axis authority.</field>
+      <field type="uint8_t" name="actuator_headroom_pct">Remaining actuator headroom.</field>
+      <field type="uint8_t" name="system_confidence_pct">Aggregated FTC confidence.</field>
+      <field type="uint8_t" name="recovery_progress_pct">Recovery-candidate state progress.</field>
+      <extensions/>
+      <field type="float[3]" name="positive_authority">Positive roll pitch yaw reachable increments in nominal matrix units.</field>
+      <field type="float[3]" name="negative_authority">Negative roll pitch yaw reachable increments in nominal matrix units.</field>
+      <field type="float" name="thrust_up">Reachable upward thrust increment.</field>
+      <field type="float" name="thrust_down">Reachable downward thrust increment.</field>
+      <field type="float" name="reachable_residual">Shadow allocation prediction residual norm.</field>
+      <field type="uint32_t" name="allocation_fallback">Active allocator fallback reason mask.</field>
+      <field type="uint32_t" name="recovery_fallback">Recovery arbitration fallback reason mask.</field>
+      <field type="float" name="arbitration_weight">Actual recovery input ownership weight.</field>
+      <field type="float" name="reentry_weight">Requested recovery ownership during reentry.</field>
+      <field type="uint8_t" name="allocation_active">Dynamic matrix differs from nominal.</field>
+      <field type="uint8_t" name="recovery_active">Recovery input arbitration is applied.</field>
+    </message>
+    <message id="60002" name="MERIVUS_FTC_EXTREME_STATUS">
+      <description>Impact, loss-of-control and recovery-candidate event summary. Percentage fields use 0..200 for 0..100 percent in 0.5 percent steps; 255 means unavailable.</description>
+      <field type="uint64_t" name="time_usec" units="us">PX4 monotonic publication timestamp.</field>
+      <field type="uint64_t" name="event_time_usec" units="us">Most recent extreme-event timestamp.</field>
+      <field type="uint32_t" name="loss_of_control_reason_mask">Loss-of-control reason bit mask.</field>
+      <field type="uint32_t" name="recovery_trigger_mask">Recovery-candidate trigger bit mask.</field>
+      <field type="uint32_t" name="recovery_inhibit_mask">Recovery-candidate inhibit bit mask.</field>
+      <field type="uint8_t" name="protocol_version">MERIVUS FTC telemetry contract version.</field>
+      <field type="uint8_t" name="impact_type" enum="MERIVUS_FTC_IMPACT_TYPE">Observed impact type.</field>
+      <field type="uint8_t" name="loc_state" enum="MERIVUS_FTC_LOC_STATE">Loss-of-control state.</field>
+      <field type="uint8_t" name="recovery_state" enum="MERIVUS_FTC_RECOVERY_STATE">Recovery-candidate state.</field>
+      <field type="uint8_t" name="flags" enum="MERIVUS_FTC_EXTREME_FLAGS">Validity and event flags.</field>
+      <field type="uint8_t" name="impact_score_pct">Impact score.</field>
+      <field type="uint8_t" name="impact_confidence_pct">Impact confidence.</field>
+      <field type="uint8_t" name="impact_severity_pct">Impact severity.</field>
+      <field type="uint8_t" name="loss_of_control_score_pct">Loss-of-control score.</field>
+      <field type="uint8_t" name="recovery_progress_pct">Recovery-candidate state progress.</field>
+    </message>
+    <message id="60003" name="MERIVUS_FTC_DIAGNOSTICS">
+      <description>Low-rate FTC engineering diagnostics. These fields are not required for the primary operator view.</description>
+      <field type="uint64_t" name="time_usec" units="us">PX4 monotonic publication timestamp.</field>
+      <field type="float" name="model_residual">Motor observer model residual.</field>
+      <field type="float" name="excitation">Observer excitation score.</field>
+      <field type="float" name="maneuver_intensity">Observed maneuver intensity.</field>
+      <field type="float" name="external_disturbance_score">Observed external-disturbance score.</field>
+      <field type="float" name="vibration_score">Observed vibration score.</field>
+      <field type="float" name="allocation_residual_norm">Shadow allocation residual norm.</field>
+      <field type="float" name="attitude_error" units="rad">Attitude error magnitude.</field>
+      <field type="float" name="rate_error" units="rad/s">Angular-rate error magnitude.</field>
+      <field type="float" name="jerk">Jerk magnitude.</field>
+      <field type="float" name="acceleration_magnitude">Acceleration magnitude.</field>
+      <field type="float" name="angular_rate" units="rad/s">Angular-rate magnitude.</field>
+      <field type="float" name="angular_acceleration">Angular-acceleration magnitude.</field>
+      <field type="uint32_t" name="system_reason_mask">Aggregated FTC reason bit mask.</field>
+      <field type="uint8_t" name="protocol_version">MERIVUS FTC telemetry contract version.</field>
+      <field type="uint8_t" name="flags" enum="MERIVUS_FTC_DIAGNOSTIC_FLAGS">Diagnostic validity and simulation flags.</field>
+      <field type="uint8_t" name="simulation_motor_index">Injected SITL motor index.</field>
+      <field type="uint8_t" name="simulation_target_effectiveness_pct">Requested SITL effectiveness using the compact percentage scaling.</field>
+      <field type="uint8_t" name="simulation_applied_effectiveness_pct">Applied SITL effectiveness using the compact percentage scaling.</field>
+      <extensions/>
+      <field type="float" name="condition_number">Regressor information matrix condition number.</field>
+      <field type="float" name="rigid_body_activity">Inertia based torque activity norm, not a prediction error.</field>
+      <field type="float" name="model_prediction_residual">Norm of predicted minus measured filtered angular response.</field>
+      <field type="uint32_t" name="update_count">Accepted parameter updates.</field>
+      <field type="uint32_t" name="reset_count">Estimator reset generation.</field>
+      <field type="float" name="mass">Observe-only mass in kg; unavailable without calibrated thrust scale.</field>
+      <field type="float[3]" name="inertia">Configured inertia; never an online valid estimate unless indicated.</field>
+      <field type="float[3]" name="cg_offset">Observe-only CG in metres; NaN when not estimated.</field>
+      <field type="uint8_t" name="mass_state">0 not implemented, 1 not observable, 2 available.</field>
+      <field type="uint8_t" name="inertia_state">0 not implemented, 1 not observable, 2 available.</field>
+      <field type="uint8_t" name="cg_state">0 not implemented, 1 not observable, 2 available.</field>
+      <field type="uint8_t" name="estimator_flags">Bit 0 update allowed, 1 saturated, 2 authority limited, 3 timing aligned.</field>
+    </message>
+  </messages>
+</mavlink>

@@ -95,3 +95,65 @@ TEST_F(PreFlightCheckerTest, testInnov2dFailed)
 		EXPECT_FALSE(PreFlightChecker::checkInnov2DFailed(innovations_lpf[i], innovations[i], 1.42, 2.84));
 	}
 }
+
+TEST_F(PreFlightCheckerTest, missingVerticalInnovationsDoNotPoisonLaterObservations)
+{
+	PreFlightChecker checker;
+	estimator_innovations_s innovations{};
+	innovations.gps_vvel = NAN;
+	innovations.ev_vvel = NAN;
+	checker.update(0.1f, innovations);
+	EXPECT_FALSE(checker.hasVertFailed());
+
+	// Below the instantaneous spike limit but above the filtered test limit:
+	// this fails only if the low-pass filter recovered from the missing data.
+	innovations.gps_vvel = 0.8f;
+
+	for (int index = 0; index < 100; ++index) {
+		checker.update(0.1f, innovations);
+	}
+
+	EXPECT_TRUE(checker.hasVertFailed());
+	innovations.gps_vvel = NAN;
+	checker.update(0.1f, innovations);
+	EXPECT_FALSE(checker.hasVertFailed());
+	innovations.gps_vvel = 0.f;
+	checker.update(0.1f, innovations);
+	EXPECT_FALSE(checker.hasVertFailed());
+}
+
+TEST_F(PreFlightCheckerTest, infiniteVerticalInnovationsAreFailuresNotMissingData)
+{
+	const float invalid_innovations[] {INFINITY, -INFINITY};
+
+	for (unsigned index = 0; index < 2; ++index) {
+		SCOPED_TRACE(index);
+		PreFlightChecker checker;
+		estimator_innovations_s innovations{};
+		innovations.gps_vvel = invalid_innovations[index];
+		innovations.ev_vvel = NAN;
+		checker.update(0.1f, innovations);
+		EXPECT_TRUE(checker.hasVertFailed());
+
+		innovations.gps_vvel = NAN;
+		innovations.ev_vvel = invalid_innovations[index];
+		checker.update(0.1f, innovations);
+		EXPECT_TRUE(checker.hasVertFailed());
+	}
+}
+
+TEST_F(PreFlightCheckerTest, missingGnssDownDoesNotHideOtherVelocityOrHeightFailures)
+{
+	PreFlightChecker checker;
+	estimator_innovations_s innovations{};
+	innovations.gps_vvel = NAN;
+	innovations.ev_vvel = 2.f;
+	checker.update(0.1f, innovations);
+	EXPECT_TRUE(checker.hasVertFailed());
+
+	innovations.ev_vvel = NAN;
+	innovations.baro_vpos = 10.f;
+	checker.setUsingBaroHgtAiding(true);
+	checker.update(0.1f, innovations);
+	EXPECT_TRUE(checker.hasVertFailed());
+}
