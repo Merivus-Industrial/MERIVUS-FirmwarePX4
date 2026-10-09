@@ -34,6 +34,7 @@
 #ifndef UAVIONIX_ADSB_OUT_DYNAMIC_HPP
 #define UAVIONIX_ADSB_OUT_DYNAMIC_HPP
 
+#include <stdint.h>
 #include <uORB/topics/sensor_gps.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_status.h>
@@ -74,14 +75,27 @@ private:
 	bool send() override
 	{
 
-		vehicle_status_s vehicle_status;
+		vehicle_status_s vehicle_status{};
 		_vehicle_status_sub.copy(&vehicle_status);
 
-		sensor_gps_s vehicle_gps_position;
+		sensor_gps_s vehicle_gps_position{};
 		_vehicle_gps_position_sub.copy(&vehicle_gps_position);
 
-		vehicle_air_data_s vehicle_air_data;
+		vehicle_air_data_s vehicle_air_data{};
 		_vehicle_air_data_sub.copy(&vehicle_air_data);
+
+		const bool ne_valid = (vehicle_gps_position.vel_ne_valid || vehicle_gps_position.vel_ned_valid)
+				      && PX4_ISFINITE(vehicle_gps_position.vel_n_m_s) && PX4_ISFINITE(vehicle_gps_position.vel_e_m_s);
+		const bool down_valid = vehicle_gps_position.vel_ned_valid && PX4_ISFINITE(vehicle_gps_position.vel_d_m_s);
+		const auto velocity_cm_s = [](float velocity) -> int16_t {
+			const float cm_s = velocity * 100.f;
+			return PX4_ISFINITE(cm_s) && cm_s >= INT16_MIN && cm_s < INT16_MAX
+			       ? static_cast<int16_t>(cm_s) : INT16_MAX;
+		};
+		const float speed_accuracy_mm_s = vehicle_gps_position.s_variance_m_s * 1000.f;
+		const uint16_t speed_accuracy = PX4_ISFINITE(speed_accuracy_mm_s)
+					       && speed_accuracy_mm_s > 0.f && speed_accuracy_mm_s < UINT16_MAX
+					       ? static_cast<uint16_t>(speed_accuracy_mm_s) : UINT16_MAX;
 
 		// Required update for dynamic message is 5 [Hz]
 		mavlink_uavionix_adsb_out_dynamic_t dynamic_msg = {
@@ -92,10 +106,10 @@ private:
 			.baroAltMSL = static_cast<int32_t>(vehicle_air_data.baro_pressure_pa / 100.0f), // convert [Pa] to [mBar]
 			.accuracyHor = static_cast<uint32_t>(vehicle_gps_position.eph * 1000.0f), // convert [m] to [mm]
 			.accuracyVert = static_cast<uint16_t>(vehicle_gps_position.epv * 100.0f), // convert [m] to [cm]
-			.accuracyVel = static_cast<uint16_t>(vehicle_gps_position.s_variance_m_s * 1000.f), // convert [m/s] to [mm/s],
-			.velVert = static_cast<int16_t>(-1.0f * vehicle_gps_position.vel_d_m_s * 100.0f), // convert [m/s] to [cm/s]
-			.velNS = static_cast<int16_t>(vehicle_gps_position.vel_n_m_s * 100.0f), // convert [m/s] to [cm/s]
-			.VelEW = static_cast<int16_t>(vehicle_gps_position.vel_e_m_s * 100.0f), // convert [m/s] to [cm/s]
+			.accuracyVel = speed_accuracy,
+			.velVert = static_cast<int16_t>(down_valid ? velocity_cm_s(-vehicle_gps_position.vel_d_m_s) : INT16_MAX),
+			.velNS = static_cast<int16_t>(ne_valid ? velocity_cm_s(vehicle_gps_position.vel_n_m_s) : INT16_MAX),
+			.VelEW = static_cast<int16_t>(ne_valid ? velocity_cm_s(vehicle_gps_position.vel_e_m_s) : INT16_MAX),
 			.state = UAVIONIX_ADSB_OUT_DYNAMIC_STATE_ON_GROUND,
 			.squawk = static_cast<uint16_t>(_adsb_squawk.get()),
 			.gpsFix = vehicle_gps_position.fix_type,

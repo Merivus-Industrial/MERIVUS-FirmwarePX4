@@ -1,0 +1,156 @@
+[
+  {
+    "active": {
+      "normal_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1433600885929682,
+        "samples": 750,
+        "xy_peak_m": 0.09017819713713544,
+        "xy_rmse_m": 0.050145921898426954,
+        "z_peak_m": 0.22327613830566406,
+        "z_rmse_m": 0.1234853814339651
+      },
+      "payload_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.6364316617845012,
+        "samples": 750,
+        "xy_peak_m": 0.07233048865019052,
+        "xy_rmse_m": 0.04687580131251151,
+        "z_peak_m": 0.2426854372024536,
+        "z_rmse_m": 0.12487746265647529
+      },
+      "wind_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1740633248283985,
+        "samples": 750,
+        "xy_peak_m": 0.06739464187417972,
+        "xy_rmse_m": 0.038713764997533893,
+        "z_peak_m": 0.1854625940322876,
+        "z_rmse_m": 0.07685387055561306
+      }
+    },
+    "baseline": {
+      "normal_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1433998607933638,
+        "samples": 750,
+        "xy_peak_m": 0.07342785078025474,
+        "xy_rmse_m": 0.043259785257969585,
+        "z_peak_m": 0.2579742670059204,
+        "z_rmse_m": 0.13886040082133536
+      },
+      "payload_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.6364635847102054,
+        "samples": 750,
+        "xy_peak_m": 0.0711097325256569,
+        "xy_rmse_m": 0.037741583850056964,
+        "z_peak_m": 0.2095125913619995,
+        "z_rmse_m": 0.10572954587963806
+      },
+      "wind_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.174705420917311,
+        "samples": 750,
+        "xy_peak_m": 0.07683469557936318,
+        "xy_rmse_m": 0.046992546609716045,
+        "z_peak_m": 0.10959422588348389,
+        "z_rmse_m": 0.04874001779927653
+      }
+    },
+    "decision": {
+      "reason": "normal hover regression: xy_rmse_m",
+      "retain": false
+    },
+    "seed": 1
+  },
+  {
+    "active": {
+      "normal_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1431615852099912,
+        "samples": 751,
+        "xy_peak_m": 0.07176414670790698,
+        "xy_rmse_m": 0.040917179372120374,
+        "z_peak_m": 0.34070777893066406,
+        "z_rmse_m": 0.22450249780074785
+      },
+      "payload_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.636835924968374,
+        "samples": 750,
+        "xy_peak_m": 0.07562458099296503,
+        "xy_rmse_m": 0.04022377237231802,
+        "z_peak_m": 0.22925758361816406,
+        "z_rmse_m": 0.1168438583165008
+      },
+      "wind_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1735320613251699,
+        "samples": 750,
+        "xy_peak_m": 0.07665539501845924,
+        "xy_rmse_m": 0.044744763418009266,
+        "z_peak_m": 0.2592238187789917,
+        "z_rmse_m": 0.1358341916223617
+      }
+    },
+    "baseline": {
+      "normal_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.142835268237711,
+        "samples": 750,
+        "xy_peak_m": 0.08935279893951675,
+        "xy_rmse_m": 0.04832223876732001,
+        "z_peak_m": 0.26774001121520996,
+        "z_rmse_m": 0.1525379754407121
+      },
+      "payload_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.6363672439621602,
+        "samples": 750,
+        "xy_peak_m": 0.0816139199857924,
+        "xy_rmse_m": 0.042190963088914735,
+        "z_peak_m": 0.17344093322753906,
+        "z_rmse_m": 0.07057686135596887
+      },
+      "wind_hover": {
+        "allocation_failure_fraction": 0.0,
+        "hard_gate_passed": true,
+        "invalid_mode_fraction": 0.0,
+        "motor_effort_mean": 1.1731648008045408,
+        "samples": 750,
+        "xy_peak_m": 0.07618995150886286,
+        "xy_rmse_m": 0.04063087456767455,
+        "z_peak_m": 0.127233624458313,
+        "z_rmse_m": 0.04802424749789913
+      }
+    },
+    "decision": {
+      "reason": "normal hover regression: z_rmse_m",
+      "retain": false
+    },
+    "seed": 2
+  }
+]

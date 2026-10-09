@@ -45,6 +45,10 @@
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
 
+#ifdef CONFIG_ARCH_BOARD_PX4_SITL
+#include "ResearchCandidate.hpp"
+#endif
+
 struct PositionControlStates {
 	matrix::Vector3f position;
 	matrix::Vector3f velocity;
@@ -157,6 +161,20 @@ public:
 	 */
 	bool update(const float dt);
 
+#ifdef CONFIG_ARCH_BOARD_PX4_SITL
+	enum class ResearchMode { Off, Shadow, Active };
+	void setResearchMode(ResearchMode mode)
+	{
+		if (mode != _research_mode) {
+			_research_candidate.reset();
+			_research_candidate_valid = false;
+			_research_mode = mode;
+		}
+	}
+	bool researchCandidateValid() const { return _research_candidate_valid; }
+	matrix::Vector3f researchCandidateCorrection() const { return _research_candidate_correction; }
+#endif
+
 	/**
 	 * Set the integral term in xy to 0.
 	 * @see _vel_int
@@ -226,4 +244,11 @@ private:
 	matrix::Vector3f _thr_sp; /**< desired thrust */
 	float _yaw_sp{}; /**< desired heading */
 	float _yawspeed_sp{}; /** desired yaw-speed */
+
+#ifdef CONFIG_ARCH_BOARD_PX4_SITL
+	ResearchMode _research_mode{ResearchMode::Off};
+	afcr::Candidate _research_candidate{};
+	matrix::Vector3f _research_candidate_correction{0.f, 0.f, 0.f};
+	bool _research_candidate_valid{false};
+#endif
 };

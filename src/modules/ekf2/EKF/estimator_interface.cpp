@@ -162,7 +162,14 @@ void EstimatorInterface::setGpsData(const gpsMessage &gps)
 
 	if (time_us >= static_cast<int64_t>(_gps_buffer->get_newest().time_us + _min_obs_interval_us)) {
 
-		if (!gps.vel_ned_valid || (gps.fix_type == 0)) {
+		const bool horizontal_velocity_valid = (gps.vel_ned_valid || gps.vel_ne_valid)
+				&& Vector2f(gps.vel_ned.xy()).isAllFinite();
+		const bool vertical_velocity_valid = !gps.vel_ned_valid || PX4_ISFINITE(gps.vel_ned(2));
+		const bool speed_accuracy_valid = PX4_ISFINITE(gps.sacc) && gps.sacc >= 0.f;
+
+		if (!horizontal_velocity_valid || !vertical_velocity_valid || !speed_accuracy_valid || (gps.fix_type == 0)) {
+			// Record a failed quality check, but never put malformed data in the fusion buffer.
+			collect_gps(gps);
 			return;
 		}
 
@@ -171,6 +178,12 @@ void EstimatorInterface::setGpsData(const gpsMessage &gps)
 		gps_sample_new.time_us = time_us;
 
 		gps_sample_new.vel = gps.vel_ned;
+		gps_sample_new.vel_d_valid = gps.vel_ned_valid;
+
+		if (!gps_sample_new.vel_d_valid) {
+			// Internal sentinel only: missing Down velocity must not become a zero observation.
+			gps_sample_new.vel(2) = NAN;
+		}
 
 		gps_sample_new.sacc = gps.sacc;
 		gps_sample_new.hacc = gps.eph;
@@ -673,7 +686,8 @@ bool EstimatorInterface::isVerticalVelocityAidingActive() const
 
 int EstimatorInterface::getNumberOfActiveVerticalVelocityAidingSources() const
 {
-	return int(_control_status.flags.gps)
+	return int(_control_status.flags.gps && _gps_sample_delayed.vel_d_valid
+		   && (_params.gnss_ctrl & GnssCtrl::VEL))
 	       + int(_control_status.flags.ev_vel);
 }
 

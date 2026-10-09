@@ -283,7 +283,10 @@ void Ekf::getGpsVelPosInnov(float hvel[2], float &vvel, float hpos[2],  float &v
 {
 	hvel[0] = _aid_src_gnss_vel.innovation[0];
 	hvel[1] = _aid_src_gnss_vel.innovation[1];
-	vvel    = _aid_src_gnss_vel.innovation[2];
+	// Preserve the legacy zero-initialized diagnostics before the first GNSS sample.
+	// Only an actual horizontal-only sample establishes that Down is unavailable.
+	vvel    = (_gps_sample_delayed.time_us != 0 && !_gps_sample_delayed.vel_d_valid)
+		  ? NAN : _aid_src_gnss_vel.innovation[2];
 
 	hpos[0] = _aid_src_gnss_pos.innovation[0];
 	hpos[1] = _aid_src_gnss_pos.innovation[1];
@@ -294,7 +297,8 @@ void Ekf::getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float 
 {
 	hvel[0] = _aid_src_gnss_vel.innovation_variance[0];
 	hvel[1] = _aid_src_gnss_vel.innovation_variance[1];
-	vvel    = _aid_src_gnss_vel.innovation_variance[2];
+	vvel    = (_gps_sample_delayed.time_us != 0 && !_gps_sample_delayed.vel_d_valid)
+		  ? NAN : _aid_src_gnss_vel.innovation_variance[2];
 
 	hpos[0] = _aid_src_gnss_pos.innovation_variance[0];
 	hpos[1] = _aid_src_gnss_pos.innovation_variance[1];
@@ -304,7 +308,8 @@ void Ekf::getGpsVelPosInnovVar(float hvel[2], float &vvel, float hpos[2], float 
 void Ekf::getGpsVelPosInnovRatio(float &hvel, float &vvel, float &hpos, float &vpos) const
 {
 	hvel = fmaxf(_aid_src_gnss_vel.test_ratio[0], _aid_src_gnss_vel.test_ratio[1]);
-	vvel = _aid_src_gnss_vel.test_ratio[2];
+	vvel = (_gps_sample_delayed.time_us != 0 && !_gps_sample_delayed.vel_d_valid)
+	       ? NAN : _aid_src_gnss_vel.test_ratio[2];
 
 	hpos = fmaxf(_aid_src_gnss_pos.test_ratio[0], _aid_src_gnss_pos.test_ratio[1]);
 	vpos = _aid_src_gnss_hgt.test_ratio;
@@ -672,7 +677,7 @@ void Ekf::get_innovation_test_status(uint16_t &status, float &mag, float &vel, f
 	pos = NAN;
 
 	if (_control_status.flags.gps) {
-		float gps_vel = sqrtf(Vector3f(_aid_src_gnss_vel.test_ratio).max());
+		float gps_vel = sqrtf(getGpsVelocityTestRatio());
 		vel = math::max(gps_vel, FLT_MIN);
 
 		float gps_pos = sqrtf(Vector2f(_aid_src_gnss_pos.test_ratio).max());
@@ -778,7 +783,7 @@ void Ekf::get_ekf_soln_status(uint16_t *status) const
 		}
 	}
 
-	const bool gps_vel_innov_bad = Vector3f(_aid_src_gnss_vel.test_ratio).max() > 1.f;
+	const bool gps_vel_innov_bad = getGpsVelocityTestRatio() > 1.f;
 	const bool gps_pos_innov_bad = Vector2f(_aid_src_gnss_pos.test_ratio).max() > 1.f;
 
 	soln_status.flags.gps_glitch = (gps_vel_innov_bad || gps_pos_innov_bad) && mag_innov_good;

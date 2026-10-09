@@ -99,6 +99,15 @@ bool PreFlightChecker::preFlightCheckHorizVelFailed(const estimator_innovations_
 bool PreFlightChecker::preFlightCheckVertVelFailed(const estimator_innovations_s &innov, const float alpha)
 {
 	const float vel_d_innov = fmaxf(fabsf(innov.gps_vvel), fabs(innov.ev_vvel));     // only temporary solution
+
+	if (!PX4_ISFINITE(vel_d_innov)) {
+		// No vertical velocity observation (for example, horizontal-only GNSS).
+		// Keep missing data out of the filter so a later valid source can be checked.
+		_filter_vel_d_innov.reset();
+		// NaN denotes no observation; infinite innovations must still fail the check.
+		return vel_d_innov > _vel_innov_spike_lim;
+	}
+
 	const float vel_d_innov_lpf = _filter_vel_d_innov.update(vel_d_innov, alpha, _vel_innov_spike_lim);
 	return checkInnovFailed(vel_d_innov_lpf, vel_d_innov, _vel_innov_test_lim, _vel_innov_spike_lim);
 }

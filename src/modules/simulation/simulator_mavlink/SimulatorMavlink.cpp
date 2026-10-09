@@ -56,6 +56,7 @@
 #include <termios.h>
 #include <arpa/inet.h>
 
+#include <float.h>
 #include <limits>
 
 static int _fd;
@@ -124,6 +125,55 @@ void SimulatorMavlink::actuator_controls_from_outputs(mavlink_hil_actuator_contr
 			msg->controls[i] = _actuator_outputs.output[i];
 		}
 	}
+
+	const hrt_abstime now = hrt_absolute_time();
+	const int32_t requested_motor_index = _param_ftc_sim_mot.get() - 1;
+	const bool injection_enabled = _param_ftc_sim_en.get()
+				       && requested_motor_index >= 0
+				       && requested_motor_index < actuator_outputs_s::NUM_ACTUATOR_OUTPUTS;
+	float target_effectiveness = math::constrain(_param_ftc_sim_eff.get(), 0.f, 1.f);
+	const float intermittent_period = _param_ftc_sim_int.get();
+	const bool intermittent = injection_enabled && intermittent_period > 0.01f;
+
+	if (intermittent) {
+		const hrt_abstime intermittent_period_us = static_cast<hrt_abstime>(intermittent_period * 1_s);
+		target_effectiveness = now % intermittent_period_us < intermittent_period_us / 2 ? target_effectiveness : 1.f;
+	}
+
+	if (!injection_enabled) {
+		_sim_effectiveness = 1.f;
+		_sim_motor_index = -1;
+
+	} else {
+		if (_sim_motor_index != requested_motor_index) {
+			_sim_effectiveness = 1.f;
+			_sim_motor_index = requested_motor_index;
+		}
+
+		const float ramp_duration = _param_ftc_sim_ramp.get();
+
+		if (ramp_duration > FLT_EPSILON && _sim_effectiveness_update != 0) {
+			const float dt = math::constrain((now - _sim_effectiveness_update) * 1e-6f, 0.f, 0.1f);
+			const float maximum_change = dt / ramp_duration;
+			_sim_effectiveness += math::constrain(target_effectiveness - _sim_effectiveness,
+						      -maximum_change, maximum_change);
+
+		} else {
+			_sim_effectiveness = target_effectiveness;
+		}
+
+		msg->controls[requested_motor_index] *= _sim_effectiveness;
+	}
+
+	_sim_effectiveness_update = now;
+	ftc_simulation_status_s simulation_status{};
+	simulation_status.timestamp = now;
+	simulation_status.enabled = injection_enabled;
+	simulation_status.intermittent = intermittent;
+	simulation_status.motor_index = injection_enabled ? static_cast<uint8_t>(requested_motor_index) : UINT8_MAX;
+	simulation_status.target_effectiveness = injection_enabled ? target_effectiveness : 1.f;
+	simulation_status.applied_effectiveness = _sim_effectiveness;
+	_ftc_simulation_status_pub.publish(simulation_status);
 
 	msg->mode = mode_flag_custom;
 	msg->mode |= (armed) ? mode_flag_armed : 0;

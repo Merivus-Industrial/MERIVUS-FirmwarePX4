@@ -149,6 +149,21 @@ void PositionControl::_velocityControl(const float dt)
 	// No control input from setpoints or corresponding states which are NAN
 	ControlMath::addIfNotNanVector3f(_acc_sp, acc_sp_velocity);
 
+#ifdef CONFIG_ARCH_BOARD_PX4_SITL
+	_research_candidate_valid = false;
+
+	if (_research_mode != ResearchMode::Off) {
+		const afcr::Candidate::Result research = _research_candidate.update(vel_error, _vel_dot, _acc_sp, dt,
+				_research_mode == ResearchMode::Active);
+		_research_candidate_correction = research.acceleration - _acc_sp;
+		_research_candidate_valid = research.valid;
+
+		if (research.valid && _research_mode == ResearchMode::Active) {
+			_acc_sp = research.acceleration;
+		}
+	}
+#endif
+
 	_accelerationControl();
 
 	// Integrator anti-windup in vertical direction

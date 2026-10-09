@@ -42,6 +42,7 @@
 
 #include "ghst_telemetry.hpp"
 #include <lib/rc/ghst.hpp>
+#include <px4_platform_common/defines.h>
 
 using time_literals::operator ""_s;
 
@@ -125,7 +126,15 @@ bool GHSTTelemetry::send_gps2_status()
 		return false;
 	}
 
-	uint16_t ground_speed = (uint16_t)(vehicle_gps_position.vel_d_m_s / 3.6f * 10.f);
+	const bool horizontal_velocity_valid = (vehicle_gps_position.vel_ne_valid || vehicle_gps_position.vel_ned_valid)
+					&& PX4_ISFINITE(vehicle_gps_position.vel_m_s) && vehicle_gps_position.vel_m_s >= 0.f
+					&& PX4_ISFINITE(vehicle_gps_position.cog_rad);
+
+	if (!horizontal_velocity_valid || vehicle_gps_position.vel_m_s * 3.6f > UINT16_MAX) {
+		return false;
+	}
+
+	uint16_t ground_speed = static_cast<uint16_t>(vehicle_gps_position.vel_m_s * 3.6f);
 	uint16_t ground_course = (uint16_t)(math::degrees(vehicle_gps_position.cog_rad) * 100.f);
 	uint8_t num_sats = vehicle_gps_position.satellites_used;
 
@@ -136,4 +145,3 @@ bool GHSTTelemetry::send_gps2_status()
 
 	return ghst_send_telemetry_gps2_status(_uart_fd, ground_speed, ground_course, num_sats, home_dist, home_dir, flags);
 }
-

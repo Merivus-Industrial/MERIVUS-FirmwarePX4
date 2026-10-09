@@ -1,0 +1,6 @@
+menuconfig MODULES_FTC_CONTROL_MONITOR
+	bool "ftc_control_monitor"
+	default n
+	depends on MODULES_CONTROL_ALLOCATOR && MODULES_MOTOR_HEALTH_MONITOR
+	---help---
+		Enable dynamic allocation shadow and remaining control authority observation

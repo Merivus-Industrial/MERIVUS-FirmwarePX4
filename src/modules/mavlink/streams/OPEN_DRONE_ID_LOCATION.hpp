@@ -128,7 +128,8 @@ private:
 			if (_vehicle_gps_position_sub.copy(&vehicle_gps_position)
 			    && (hrt_elapsed_time(&vehicle_gps_position.timestamp) < 10_s)) {
 
-				if (vehicle_gps_position.vel_ned_valid) {
+				if ((vehicle_gps_position.vel_ne_valid || vehicle_gps_position.vel_ned_valid)
+				    && PX4_ISFINITE(vehicle_gps_position.vel_n_m_s) && PX4_ISFINITE(vehicle_gps_position.vel_e_m_s)) {
 					const matrix::Vector3f vel_ned{vehicle_gps_position.vel_n_m_s, vehicle_gps_position.vel_e_m_s, vehicle_gps_position.vel_d_m_s};
 
 					// direction: calculate GPS course over ground angle
@@ -141,11 +142,16 @@ private:
 					msg.speed_horizontal = math::constrain(speed_horizontal_cm_s, 0, 25425);
 
 					// speed_vertical: Up is positive, If speed is larger than 6200 cm/s, use 6200 cm/s. If lower than -6200 cm/s, use -6200 cm/s.
-					const int speed_vertical_cm_s = roundf(-vel_ned(2) * 100.f);
-					msg.speed_vertical = math::constrain(speed_vertical_cm_s, -6200, 6200);
+					if (vehicle_gps_position.vel_ned_valid && PX4_ISFINITE(vel_ned(2))) {
+						const int speed_vertical_cm_s = roundf(-vel_ned(2) * 100.f);
+						msg.speed_vertical = math::constrain(speed_vertical_cm_s, -6200, 6200);
+					}
 
 					// speed_accuracy
-					if (vehicle_gps_position.s_variance_m_s < 0.3f) {
+					if (!PX4_ISFINITE(vehicle_gps_position.s_variance_m_s) || vehicle_gps_position.s_variance_m_s <= 0.f) {
+						msg.speed_accuracy = MAV_ODID_SPEED_ACC_UNKNOWN;
+
+					} else if (vehicle_gps_position.s_variance_m_s < 0.3f) {
 						msg.speed_accuracy = MAV_ODID_SPEED_ACC_0_3_METERS_PER_SECOND;
 
 					} else if (vehicle_gps_position.s_variance_m_s < 1.f) {

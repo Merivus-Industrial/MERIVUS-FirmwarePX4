@@ -153,8 +153,8 @@ void SensorGpsSim::Run()
 		sensor_gps.timestamp_sample = gpos.timestamp_sample;
 		sensor_gps.time_utc_usec = 0;
 		sensor_gps.device_id = device_id.devid;
-		sensor_gps.lat = roundf(latitude * 1e7); // Latitude in 1E-7 degrees
-		sensor_gps.lon = roundf(longitude * 1e7); // Longitude in 1E-7 degrees
+		sensor_gps.lat = round(latitude * 1e7); // Latitude in 1E-7 degrees; retain double precision until rounding
+		sensor_gps.lon = round(longitude * 1e7); // Longitude in 1E-7 degrees; retain double precision until rounding
 		sensor_gps.alt = roundf(altitude * 1000.f); // Altitude in 1E-3 meters above MSL, (millimetres)
 		sensor_gps.alt_ellipsoid = sensor_gps.alt;
 		sensor_gps.noise_per_ms = 0;

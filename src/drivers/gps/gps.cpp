@@ -1220,7 +1220,18 @@ GPS::publish()
 		_report_gps_pos.selected_rtcm_instance = _selected_rtcm_instance;
 		_report_gps_pos.rtcm_injection_rate = _rate_rtcm_injection;
 
-		_report_gps_pos_pub.publish(_report_gps_pos);
+		// The pinned NMEA parser reports horizontal RMC/VTG speed as full NED speed.
+		// Correct the public contract here without modifying the fixed GPS submodule.
+		sensor_gps_s report{_report_gps_pos};
+
+		if (_mode == gps_driver_mode_t::NMEA) {
+			report.vel_ne_valid = report.vel_ned_valid && report.fix_type >= 2
+					      && PX4_ISFINITE(report.vel_m_s) && report.vel_m_s >= 0.f
+					      && PX4_ISFINITE(report.vel_n_m_s) && PX4_ISFINITE(report.vel_e_m_s);
+			report.vel_ned_valid = false;
+		}
+
+		_report_gps_pos_pub.publish(report);
 		// Heading/yaw data can be updated at a lower rate than the other navigation data.
 		// The uORB message definition requires this data to be set to a NAN if no new valid data is available.
 		_report_gps_pos.heading = NAN;

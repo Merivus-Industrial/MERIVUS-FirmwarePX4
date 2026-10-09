@@ -37,6 +37,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include "EKF/ekf.h"
 #include "sensor_simulator/sensor_simulator.h"
 #include "sensor_simulator/ekf_wrapper.h"
@@ -195,4 +196,265 @@ TEST_F(EkfGpsTest, altitudeDrift)
 
 	// THEN: the baro and local position should follow it
 	EXPECT_LT(fabsf(baro_innov), 0.1f);
+}
+
+// Exercise the actual GNSS input buffer, quality checks, fusion controller and
+// reset paths. No mock implementation of the two-dimensional fusion is used.
+class EkfGpsVelocityDimensionsTest : public ::testing::Test
+{
+public:
+	std::shared_ptr<Ekf> _ekf{std::make_shared<Ekf>()};
+	SensorSimulator _sensor_simulator{_ekf};
+	EkfWrapper _ekf_wrapper{_ekf};
+
+	void SetUp() override
+	{
+		_ekf->init(0);
+		_sensor_simulator.runSeconds(0.1f);
+		_ekf->set_in_air_status(false);
+		_ekf->set_vehicle_at_rest(true);
+		_sensor_simulator.runSeconds(2.f);
+
+		// Isolate velocity dimensions from GNSS-height-source changes. Barometer
+		// aiding remains enabled throughout these tests.
+		_ekf->getParamHandle()->gnss_ctrl = GnssCtrl::HPOS | GnssCtrl::VEL;
+		_ekf->getParamHandle()->gps_vel_noise = 0.3f;
+		_ekf->getParamHandle()->req_sacc = 0.5f;
+	}
+
+	gpsMessage horizontalGps(float accuracy = 0.2f)
+	{
+		gpsMessage gps = _sensor_simulator._gps.getDefaultGpsData();
+		gps.vel_ne_valid = true;
+		gps.vel_ned_valid = false;
+		gps.sacc = accuracy;
+		return gps;
+	}
+
+	void startGps(const gpsMessage &gps)
+	{
+		_sensor_simulator._gps.setData(gps);
+		_sensor_simulator.startGps();
+		_sensor_simulator.runSeconds(11.f);
+	}
+
+	bool gsfHasStarted()
+	{
+		float yaw{};
+		float variance{};
+		float models[5]{};
+		float innov_n[5]{};
+		float innov_e[5]{};
+		float weights[5]{};
+		return _ekf->getDataEKFGSF(&yaw, &variance, models, innov_n, innov_e, weights);
+	}
+
+	void expectMalformedAccuracyRejected(float accuracy)
+	{
+		startGps(horizontalGps(accuracy));
+		EXPECT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
+		EXPECT_TRUE(_ekf->gps_check_fail_status_flags().sacc);
+		EXPECT_EQ(_ekf->get_gps_sample_delayed().time_us, 0u);
+		EXPECT_TRUE(_ekf->getVelocity().isAllFinite());
+		EXPECT_FALSE(gsfHasStarted());
+	}
+};
+
+TEST_F(EkfGpsVelocityDimensionsTest, noGnssSampleKeepsLegacyDiagnosticsUntilActualHorizontalOnlyData)
+{
+	ASSERT_EQ(_ekf->get_gps_sample_delayed().time_us, 0u);
+	float horizontal_velocity[2]{};
+	float vertical_velocity{};
+	float horizontal_position[2]{};
+	float vertical_position{};
+	float horizontal_velocity_ratio{};
+	float horizontal_position_ratio{};
+
+	_ekf->getGpsVelPosInnov(horizontal_velocity, vertical_velocity, horizontal_position, vertical_position);
+	EXPECT_FLOAT_EQ(vertical_velocity, 0.f);
+	_ekf->getGpsVelPosInnovVar(horizontal_velocity, vertical_velocity, horizontal_position, vertical_position);
+	EXPECT_FLOAT_EQ(vertical_velocity, 0.f);
+	_ekf->getGpsVelPosInnovRatio(horizontal_velocity_ratio, vertical_velocity, horizontal_position_ratio,
+				   vertical_position);
+	EXPECT_FLOAT_EQ(vertical_velocity, 0.f);
+
+	// A received 2D sample is a different state from "no sample ever received".
+	startGps(horizontalGps());
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	ASSERT_GT(_ekf->get_gps_sample_delayed().time_us, 0u);
+	ASSERT_FALSE(_ekf->get_gps_sample_delayed().vel_d_valid);
+	_ekf->getGpsVelPosInnov(horizontal_velocity, vertical_velocity, horizontal_position, vertical_position);
+	EXPECT_TRUE(std::isnan(vertical_velocity));
+	_ekf->getGpsVelPosInnovVar(horizontal_velocity, vertical_velocity, horizontal_position, vertical_position);
+	EXPECT_TRUE(std::isnan(vertical_velocity));
+	_ekf->getGpsVelPosInnovRatio(horizontal_velocity_ratio, vertical_velocity, horizontal_position_ratio,
+				   vertical_position);
+	EXPECT_TRUE(std::isnan(vertical_velocity));
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, horizontalOnlyStartsAndFusesWithoutDownObservation)
+{
+	gpsMessage gps = horizontalGps();
+	// A conspicuous storage value must not be used when the dimension is absent.
+	gps.vel_ned(2) = 75.f;
+	const uint8_t vertical_resets = _ekf->get_velD_reset_count();
+	startGps(gps);
+
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	const auto &aid = _ekf->aid_src_gnss_vel();
+	EXPECT_TRUE(aid.fused);
+	EXPECT_FALSE(aid.innovation_rejected);
+	EXPECT_TRUE(PX4_ISFINITE(aid.observation[0]));
+	EXPECT_TRUE(PX4_ISFINITE(aid.observation[1]));
+	EXPECT_TRUE(std::isnan(aid.observation[2]));
+	EXPECT_TRUE(std::isnan(aid.innovation[2]));
+	EXPECT_TRUE(std::isnan(aid.innovation_variance[2]));
+	EXPECT_TRUE(std::isnan(aid.test_ratio[2]));
+	EXPECT_FALSE(_ekf->get_gps_sample_delayed().vel_d_valid);
+	EXPECT_FALSE(_ekf->isVerticalVelocityAidingActive());
+	EXPECT_EQ(_ekf->get_velD_reset_count(), vertical_resets);
+	EXPECT_NEAR(_ekf->getVelocity()(2), 0.f, 0.01f);
+
+	float horizontal_ratio{};
+	float vertical_ratio{};
+	float position_ratio{};
+	float height_ratio{};
+	_ekf->getGpsVelPosInnovRatio(horizontal_ratio, vertical_ratio, position_ratio, height_ratio);
+	EXPECT_TRUE(PX4_ISFINITE(horizontal_ratio));
+	EXPECT_TRUE(std::isnan(vertical_ratio));
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, horizontalOnlyRestartResetsNEButNotDown)
+{
+	startGps(horizontalGps());
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	_sensor_simulator.stopGps();
+	_sensor_simulator.runSeconds(11.f);
+	ASSERT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
+
+	ResetLoggingChecker resets(_ekf);
+	resets.capturePreResetState();
+	const float down_velocity = _ekf->getVelocity()(2);
+	gpsMessage gps = horizontalGps();
+	gps.vel_ned = Vector3f(0.5f, 1.f, 75.f);
+	_sensor_simulator._gps.setData(gps);
+	_sensor_simulator.startGps();
+	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
+	_sensor_simulator.runMicroseconds(100000);
+
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	resets.capturePostResetState();
+	EXPECT_TRUE(resets.isHorizontalVelocityResetCounterIncreasedBy(1));
+	EXPECT_TRUE(resets.isVerticalVelocityResetCounterIncreasedBy(0));
+	EXPECT_NEAR(_ekf->getVelocity()(0), gps.vel_ned(0), 0.01f);
+	EXPECT_NEAR(_ekf->getVelocity()(1), gps.vel_ned(1), 0.01f);
+	EXPECT_NEAR(_ekf->getVelocity()(2), down_velocity, 0.01f);
+	EXPECT_FALSE(_ekf->gps_check_fail_status_flags().vspeed);
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, legacyThreeDimensionalRestartStillResetsAllAxes)
+{
+	const gpsMessage initial = _sensor_simulator._gps.getDefaultGpsData();
+	ASSERT_FALSE(initial.vel_ne_valid);
+	ASSERT_TRUE(initial.vel_ned_valid);
+	startGps(initial);
+	ASSERT_TRUE(_ekf->isVerticalVelocityAidingActive());
+	_sensor_simulator.stopGps();
+	_sensor_simulator.runSeconds(11.f);
+	ASSERT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
+
+	ResetLoggingChecker resets(_ekf);
+	resets.capturePreResetState();
+	gpsMessage gps = initial;
+	gps.vel_ned = Vector3f(0.5f, 1.f, -0.3f);
+	_sensor_simulator._gps.setData(gps);
+	_sensor_simulator.startGps();
+	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
+	_sensor_simulator.runMicroseconds(100000);
+
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	resets.capturePostResetState();
+	EXPECT_TRUE(resets.isHorizontalVelocityResetCounterIncreasedBy(1));
+	EXPECT_TRUE(resets.isVerticalVelocityResetCounterIncreasedBy(1));
+	EXPECT_NEAR(_ekf->getVelocity()(2), gps.vel_ned(2), 0.01f);
+	EXPECT_TRUE(_ekf->get_gps_sample_delayed().vel_d_valid);
+	EXPECT_TRUE(PX4_ISFINITE(_ekf->aid_src_gnss_vel().observation[2]));
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, dimensionSwitchClearsAndRestoresDownStatus)
+{
+	startGps(_sensor_simulator._gps.getDefaultGpsData());
+	ASSERT_TRUE(_ekf->isVerticalVelocityAidingActive());
+	const uint8_t vertical_resets = _ekf->get_velD_reset_count();
+	gpsMessage gps = horizontalGps();
+	gps.vel_ned(2) = 75.f;
+	_sensor_simulator._gps.setData(gps);
+	_sensor_simulator.runSeconds(1.f);
+
+	EXPECT_TRUE(_ekf->aid_src_gnss_vel().fused);
+	EXPECT_FALSE(_ekf->isVerticalVelocityAidingActive());
+	EXPECT_TRUE(std::isnan(_ekf->aid_src_gnss_vel().observation[2]));
+	EXPECT_EQ(_ekf->get_velD_reset_count(), vertical_resets);
+
+	_sensor_simulator._gps.setData(_sensor_simulator._gps.getDefaultGpsData());
+	_sensor_simulator.runSeconds(1.f);
+	EXPECT_TRUE(_ekf->aid_src_gnss_vel().fused);
+	EXPECT_TRUE(_ekf->isVerticalVelocityAidingActive());
+	EXPECT_TRUE(PX4_ISFINITE(_ekf->aid_src_gnss_vel().observation[2]));
+	EXPECT_EQ(_ekf->get_velD_reset_count(), vertical_resets);
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, unknownAccuracyUsesNoiseFloorButDoesNotStartGsf)
+{
+	startGps(horizontalGps(0.f));
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	EXPECT_TRUE(_ekf->aid_src_gnss_vel().fused);
+	EXPECT_FLOAT_EQ(_ekf->get_gps_sample_delayed().sacc, 0.f);
+	EXPECT_FLOAT_EQ(_ekf->aid_src_gnss_vel().observation_variance[0], 0.3f * 0.3f);
+	EXPECT_FLOAT_EQ(_ekf->aid_src_gnss_vel().observation_variance[1], 0.3f * 0.3f);
+	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
+	_sensor_simulator.runSeconds(3.f);
+	EXPECT_FALSE(gsfHasStarted());
+	EXPECT_FALSE(_ekf->isYawEmergencyEstimateAvailable());
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, reportedAccuracyAllowsHorizontalOnlyGsfInput)
+{
+	startGps(horizontalGps(0.2f));
+	ASSERT_TRUE(_ekf_wrapper.isIntendingGpsFusion());
+	EXPECT_FALSE(gsfHasStarted()); // Ground handling must not start the GSF EKFs.
+	_ekf->set_in_air_status(true);
+	_ekf->set_vehicle_at_rest(false);
+	_sensor_simulator.runSeconds(1.f);
+	EXPECT_TRUE(gsfHasStarted());
+	// Starting the filter is not a claim that stationary yaw is observable or converged.
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, negativeAccuracyIsRejected)
+{
+	expectMalformedAccuracyRejected(-0.1f);
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, nanAccuracyIsRejected)
+{
+	expectMalformedAccuracyRejected(NAN);
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, infiniteAccuracyIsRejected)
+{
+	expectMalformedAccuracyRejected(INFINITY);
+}
+
+TEST_F(EkfGpsVelocityDimensionsTest, malformedDeclaredDownVelocityIsNotSilentlyAcceptedAs2D)
+{
+	gpsMessage gps = _sensor_simulator._gps.getDefaultGpsData();
+	gps.vel_ned(2) = NAN;
+	startGps(gps);
+	EXPECT_FALSE(_ekf_wrapper.isIntendingGpsFusion());
+	EXPECT_TRUE(_ekf->gps_check_fail_status_flags().vspeed);
+	EXPECT_EQ(_ekf->get_gps_sample_delayed().time_us, 0u);
+	EXPECT_TRUE(_ekf->getVelocity().isAllFinite());
 }

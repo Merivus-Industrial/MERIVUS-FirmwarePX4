@@ -73,6 +73,12 @@
 #include "streams/EFI_STATUS.hpp"
 #include "streams/ESC_INFO.hpp"
 #include "streams/ESC_STATUS.hpp"
+#if defined(MAVLINK_MSG_ID_MERIVUS_FTC_MOTOR_STATUS)
+#include "streams/MERIVUS_FTC_CONTROL_STATUS.hpp"
+#include "streams/MERIVUS_FTC_DIAGNOSTICS.hpp"
+#include "streams/MERIVUS_FTC_EXTREME_STATUS.hpp"
+#include "streams/MERIVUS_FTC_MOTOR_STATUS.hpp"
+#endif
 #include "streams/ESTIMATOR_STATUS.hpp"
 #include "streams/EXTENDED_SYS_STATE.hpp"
 #include "streams/FLIGHT_INFORMATION.hpp"
@@ -444,6 +450,18 @@ static const StreamListItem streams_list[] = {
 #if defined(ESC_STATUS_HPP)
 	create_stream_list_item<MavlinkStreamESCStatus>(),
 #endif // ESC_STATUS_HPP
+#if defined(MERIVUS_FTC_CONTROL_STATUS_HPP)
+	create_stream_list_item<MavlinkStreamMerivusFtcControlStatus>(),
+#endif // MERIVUS_FTC_CONTROL_STATUS_HPP
+#if defined(MERIVUS_FTC_DIAGNOSTICS_HPP)
+	create_stream_list_item<MavlinkStreamMerivusFtcDiagnostics>(),
+#endif // MERIVUS_FTC_DIAGNOSTICS_HPP
+#if defined(MERIVUS_FTC_EXTREME_STATUS_HPP)
+	create_stream_list_item<MavlinkStreamMerivusFtcExtremeStatus>(),
+#endif // MERIVUS_FTC_EXTREME_STATUS_HPP
+#if defined(MERIVUS_FTC_MOTOR_STATUS_HPP)
+	create_stream_list_item<MavlinkStreamMerivusFtcMotorStatus>(),
+#endif // MERIVUS_FTC_MOTOR_STATUS_HPP
 #if defined(AUTOPILOT_VERSION_HPP)
 	create_stream_list_item<MavlinkStreamAutopilotVersion>(),
 #endif // AUTOPILOT_VERSION_HPP

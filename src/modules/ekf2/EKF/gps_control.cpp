@@ -56,7 +56,11 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 		const Vector3f pos_offset_body = _params.gps_pos_body - _params.imu_pos_body;
 		const Vector3f vel_offset_body = _ang_rate_delayed_raw % pos_offset_body;
 		const Vector3f vel_offset_earth = _R_to_earth * vel_offset_body;
-		_gps_sample_delayed.vel -= vel_offset_earth;
+		_gps_sample_delayed.vel.xy() -= vel_offset_earth.xy();
+
+		if (_gps_sample_delayed.vel_d_valid) {
+			_gps_sample_delayed.vel(2) -= vel_offset_earth(2);
+		}
 
 		// correct position and height for offset relative to IMU
 		const Vector3f pos_offset_earth = _R_to_earth * pos_offset_body;
@@ -64,8 +68,11 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 		_gps_sample_delayed.hgt += pos_offset_earth(2);
 
 		// update GSF yaw estimator velocity (basic sanity check on GNSS velocity data)
-		if ((_gps_sample_delayed.sacc > 0.f) && (_gps_sample_delayed.sacc < _params.req_sacc)
-		    && _gps_sample_delayed.vel.isAllFinite()
+		// GSF needs horizontal velocity only, but still requires a reported accuracy.
+		// A zero (unknown) accuracy is not evidence for enabling emergency yaw aiding.
+		if (PX4_ISFINITE(_gps_sample_delayed.sacc)
+		    && (_gps_sample_delayed.sacc > 0.f) && (_gps_sample_delayed.sacc < _params.req_sacc)
+		    && Vector2f(_gps_sample_delayed.vel.xy()).isAllFinite()
 		   ) {
 			_yawEstimator.setVelocity(_gps_sample_delayed.vel.xy(), math::max(_gps_sample_delayed.sacc, _params.gps_vel_noise));
 		}
@@ -87,14 +94,11 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 #endif // CONFIG_EKF2_GNSS_YAW
 
 		// GNSS velocity
-		const Vector3f velocity{gps_sample.vel};
+		// For an unreported accuracy (zero), preserve the configured noise floor.
+		// This is an observation-noise assumption, not receiver accuracy metadata.
 		const float vel_var = sq(math::max(gps_sample.sacc, _params.gps_vel_noise));
 		const Vector3f vel_obs_var(vel_var, vel_var, vel_var * sq(1.5f));
-		updateVelocityAidSrcStatus(gps_sample.time_us,
-					   velocity,                                                   // observation
-					   vel_obs_var,                                                // observation variance
-					   math::max(_params.gps_vel_innov_gate, 1.f),                 // innovation gate
-					   _aid_src_gnss_vel);
+		updateGpsVelocityAidSrcStatus(gps_sample, vel_obs_var);
 		_aid_src_gnss_vel.fusion_enabled = (_params.gnss_ctrl & GnssCtrl::VEL);
 
 		// GNSS position
@@ -157,7 +161,7 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 				if (continuing_conditions_passing
 				    || !isOtherSourceOfHorizontalAidingThan(_control_status.flags.gps)) {
 
-					fuseVelocity(_aid_src_gnss_vel);
+					fuseGpsVelocity(gps_sample);
 					fuseHorizontalPosition(_aid_src_gnss_pos);
 
 					bool do_vel_pos_reset = shouldResetGpsFusion();
@@ -182,7 +186,7 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 
 						// reset velocity
 						_information_events.flags.reset_vel_to_gps = true;
-						resetVelocityTo(velocity, vel_obs_var);
+						resetGpsVelocityTo(gps_sample, vel_obs_var);
 						_aid_src_gnss_vel.time_last_fuse = _time_delayed_us;
 
 						// reset position
@@ -223,7 +227,7 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 				   ) {
 					// reset velocity
 					_information_events.flags.reset_vel_to_gps = true;
-					resetVelocityTo(velocity, vel_obs_var);
+					resetGpsVelocityTo(gps_sample, vel_obs_var);
 					_aid_src_gnss_vel.time_last_fuse = _time_delayed_us;
 				}
 
@@ -242,7 +246,7 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 
 					// reset velocity
 					_information_events.flags.reset_vel_to_gps = true;
-					resetVelocityTo(velocity, vel_obs_var);
+					resetGpsVelocityTo(gps_sample, vel_obs_var);
 					_aid_src_gnss_vel.time_last_fuse = _time_delayed_us;
 
 					// reset position
@@ -267,6 +271,80 @@ void Ekf::controlGpsFusion(const imuSample &imu_delayed)
 		_warning_events.flags.gps_data_stopped_using_alternate = true;
 		ECL_WARN("GPS data stopped, using only EV, OF or air data");
 	}
+}
+
+void Ekf::updateGpsVelocityAidSrcStatus(const gpsSample &gps_sample, const Vector3f &velocity_variance)
+{
+	const float innovation_gate = math::max(_params.gps_vel_innov_gate, 1.f);
+
+	if (gps_sample.vel_d_valid) {
+		updateVelocityAidSrcStatus(gps_sample.time_us, gps_sample.vel, velocity_variance,
+					   innovation_gate, _aid_src_gnss_vel);
+		return;
+	}
+
+	// Keep the existing GNSS topic layout, but gate only the two measured axes.
+	// Passing a missing Down component to the generic 3D gate would reject NE too.
+	estimator_aid_source2d_s horizontal_aid{};
+	updateVelocityAidSrcStatus(gps_sample.time_us, Vector2f(gps_sample.vel.xy()),
+				   Vector2f(velocity_variance.xy()), innovation_gate, horizontal_aid);
+	resetEstimatorAidStatus(_aid_src_gnss_vel);
+
+	for (int axis = 0; axis < 2; ++axis) {
+		_aid_src_gnss_vel.observation[axis] = horizontal_aid.observation[axis];
+		_aid_src_gnss_vel.observation_variance[axis] = horizontal_aid.observation_variance[axis];
+		_aid_src_gnss_vel.innovation[axis] = horizontal_aid.innovation[axis];
+		_aid_src_gnss_vel.innovation_variance[axis] = horizontal_aid.innovation_variance[axis];
+		_aid_src_gnss_vel.test_ratio[axis] = horizontal_aid.test_ratio[axis];
+	}
+
+	// Missing observations are visible as unavailable, never as passing zero innovations.
+	_aid_src_gnss_vel.observation[2] = NAN;
+	_aid_src_gnss_vel.observation_variance[2] = NAN;
+	_aid_src_gnss_vel.innovation[2] = NAN;
+	_aid_src_gnss_vel.innovation_variance[2] = NAN;
+	_aid_src_gnss_vel.test_ratio[2] = NAN;
+	_aid_src_gnss_vel.timestamp_sample = horizontal_aid.timestamp_sample;
+	_aid_src_gnss_vel.innovation_rejected = horizontal_aid.innovation_rejected;
+	_aid_src_gnss_vel.fused = false;
+}
+
+void Ekf::fuseGpsVelocity(const gpsSample &gps_sample)
+{
+	if (gps_sample.vel_d_valid) {
+		fuseVelocity(_aid_src_gnss_vel);
+		return;
+	}
+
+	if (_aid_src_gnss_vel.fusion_enabled && !_aid_src_gnss_vel.innovation_rejected) {
+		_aid_src_gnss_vel.fused =
+			fuseVelPosHeight(_aid_src_gnss_vel.innovation[0], _aid_src_gnss_vel.innovation_variance[0], 0)
+			&& fuseVelPosHeight(_aid_src_gnss_vel.innovation[1], _aid_src_gnss_vel.innovation_variance[1], 1);
+
+		if (_aid_src_gnss_vel.fused) {
+			_aid_src_gnss_vel.time_last_fuse = _time_delayed_us;
+		}
+	}
+}
+
+void Ekf::resetGpsVelocityTo(const gpsSample &gps_sample, const Vector3f &velocity_variance)
+{
+	resetHorizontalVelocityTo(Vector2f(gps_sample.vel.xy()), Vector2f(velocity_variance.xy()));
+
+	if (gps_sample.vel_d_valid) {
+		resetVerticalVelocityTo(gps_sample.vel(2), velocity_variance(2));
+	}
+}
+
+float Ekf::getGpsVelocityTestRatio() const
+{
+	float test_ratio = math::max(_aid_src_gnss_vel.test_ratio[0], _aid_src_gnss_vel.test_ratio[1]);
+
+	if (_gps_sample_delayed.vel_d_valid) {
+		test_ratio = math::max(test_ratio, _aid_src_gnss_vel.test_ratio[2]);
+	}
+
+	return test_ratio;
 }
 
 bool Ekf::shouldResetGpsFusion() const

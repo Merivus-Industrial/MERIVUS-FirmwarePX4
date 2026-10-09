@@ -21,6 +21,8 @@ void BlockLocalPositionEstimator::gpsInit()
 		nSat < 6 ||
 		eph > _param_lpe_eph_max.get() ||
 		epv > _param_lpe_epv_max.get() ||
+		!PX4_ISFINITE(eph) ||
+		!PX4_ISFINITE(epv) ||
 		fix_type < 3
 	) {
 		_gpsStats.reset();
@@ -90,14 +92,24 @@ void BlockLocalPositionEstimator::gpsInit()
 
 int BlockLocalPositionEstimator::gpsMeasure(Vector<double, n_y_gps> &y)
 {
+	const auto &gps = _sub_gps.get();
+	const bool horizontal_velocity_valid = (gps.vel_ne_valid || gps.vel_ned_valid)
+					&& PX4_ISFINITE(gps.vel_n_m_s) && PX4_ISFINITE(gps.vel_e_m_s);
+	const bool vertical_velocity_valid = !gps.vel_ned_valid || PX4_ISFINITE(gps.vel_d_m_s);
+
+	if (!horizontal_velocity_valid || !vertical_velocity_valid
+	    || !PX4_ISFINITE(gps.s_variance_m_s) || gps.s_variance_m_s < 0.f) {
+		return ERROR;
+	}
+
 	// gps measurement
 	y.setZero();
-	y(0) = _sub_gps.get().lat * 1e-7;
-	y(1) = _sub_gps.get().lon * 1e-7;
-	y(2) = _sub_gps.get().alt * 1e-3;
-	y(3) = (double)_sub_gps.get().vel_n_m_s;
-	y(4) = (double)_sub_gps.get().vel_e_m_s;
-	y(5) = (double)_sub_gps.get().vel_d_m_s;
+	y(0) = gps.lat * 1e-7;
+	y(1) = gps.lon * 1e-7;
+	y(2) = gps.alt * 1e-3;
+	y(3) = static_cast<double>(gps.vel_n_m_s);
+	y(4) = static_cast<double>(gps.vel_e_m_s);
+	y(5) = gps.vel_ned_valid ? static_cast<double>(gps.vel_d_m_s) : 0.0;
 
 	// increament sums for mean
 	_gpsStats.update(y);
@@ -128,6 +140,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	y(Y_gps_vx) = y_global(Y_gps_vx);
 	y(Y_gps_vy) = y_global(Y_gps_vy);
 	y(Y_gps_vz) = y_global(Y_gps_vz);
+	const bool vertical_velocity_valid = _sub_gps.get().vel_ned_valid;
 
 	// gps measurement matrix, measures position and velocity
 	Matrix<float, n_y_gps, n_x> C;
@@ -137,7 +150,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	C(Y_gps_z, X_z) = 1;
 	C(Y_gps_vx, X_vx) = 1;
 	C(Y_gps_vy, X_vy) = 1;
-	C(Y_gps_vz, X_vz) = 1;
+	C(Y_gps_vz, X_vz) = vertical_velocity_valid ? 1.f : 0.f;
 
 	// gps covariance matrix
 	SquareMatrix<float, n_y_gps> R;
@@ -173,7 +186,8 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	R(2, 2) = var_z;
 	R(3, 3) = var_vxy;
 	R(4, 4) = var_vxy;
-	R(5, 5) = var_vz;
+	// With no Down observation, a zero measurement row contributes no state update.
+	R(5, 5) = vertical_velocity_valid ? var_vz : 1.f;
 
 	// get delayed x
 	uint8_t i_hist = 0;
@@ -194,7 +208,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	_pub_innov.get().gps_vpos    = r(2);
 	_pub_innov.get().gps_hvel[0] = r(3);
 	_pub_innov.get().gps_hvel[1] = r(4);
-	_pub_innov.get().gps_vvel    = r(5);
+	_pub_innov.get().gps_vvel    = vertical_velocity_valid ? r(5) : NAN;
 
 	// publish innovation variances
 	_pub_innov_var.get().gps_hpos[0] = S(0, 0);
@@ -202,7 +216,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	_pub_innov_var.get().gps_vpos    = S(2, 2);
 	_pub_innov_var.get().gps_hvel[0] = S(3, 3);
 	_pub_innov_var.get().gps_hvel[1] = S(4, 4);
-	_pub_innov_var.get().gps_vvel    = S(5, 5);
+	_pub_innov_var.get().gps_vvel    = vertical_velocity_valid ? S(5, 5) : NAN;
 
 	// residual covariance, (inverse)
 	Matrix<float, n_y_gps, n_y_gps> S_I = inv<float, n_y_gps>(S);
@@ -213,7 +227,7 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	// artificially increase beta threshhold to prevent fault during landing
 	float beta_thresh = 1e2f;
 
-	if (beta / BETA_TABLE[n_y_gps] > beta_thresh) {
+	if (beta / BETA_TABLE[vertical_velocity_valid ? n_y_gps : n_y_gps - 1] > beta_thresh) {
 		if (!(_sensorFault & SENSOR_GPS)) {
 			mavlink_log_critical(&mavlink_log_pub, "[lpe] gps fault %3g %3g %3g %3g %3g %3g",
 					     double(r(0) * r(0) / S_I(0, 0)),  double(r(1) * r(1) / S_I(1, 1)), double(r(2) * r(2) / S_I(2, 2)),

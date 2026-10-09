@@ -113,7 +113,9 @@ include(px4_parse_function_args)
 include(px4_git)
 
 execute_process(
-	COMMAND git describe --exclude ext/* --always --tags
+	# Only release-style tags provide the X.Y.Z fields parsed below. Archive
+	# and operational tags must not change or invalidate the build version.
+	COMMAND git describe --exclude ext/* --match "v[0-9]*.[0-9]*.[0-9]*" --always --tags
 	OUTPUT_VARIABLE PX4_GIT_TAG
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 	WORKING_DIRECTORY ${PX4_SOURCE_DIR}

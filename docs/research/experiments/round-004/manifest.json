@@ -1,0 +1,27 @@
+{
+  "candidate_sha256": "0ff190ceebc00ea7ff8e79e148350cb903576aaf3505a0f2bd3babecd5bdfee2",
+  "git_head": "6c85ff779f2351e24b9ac1ff78122db6c8b2f227",
+  "mode_order_by_seed": {
+    "11": [
+      "active",
+      "off"
+    ],
+    "12": [
+      "off",
+      "active"
+    ]
+  },
+  "scripts_sha256": {
+    "candidate.py": "387e62630c337727774853e5eaa70d463b7cf8eb5a9481918a5afda4def8972b",
+    "cycle.py": "6caf211fd856c358d4f36609c9218825617f62a87ed12d1d987401e652d5c065",
+    "evaluate.py": "9d969bf7143ce61b4758bb25e252c9a5cebfbd2bcfd91819c672222b64fd4270",
+    "research.py": "ece6b70d6d429ac191122ffe98720354378ed8ad14c9f87c623f886619c2e043",
+    "run_sitl.py": "a392e3cc1ebb17a8ed33dca430460c32efb56bf8781765a45b2ce37cc662438a",
+    "shadow.py": "1e842e926bd2913ef8cbb86ecdffa6d2073fe7ea0ed0ecf552088d8a4eef544a",
+    "test_research.py": "5c32e1dc8c985e5d8a96d49d5d4404f39ddbdd143ba108bfb5437855da6c874a"
+  },
+  "seeds": [
+    11,
+    12
+  ]
+}

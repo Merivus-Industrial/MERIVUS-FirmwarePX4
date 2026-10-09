@@ -13,18 +13,27 @@
 param set-default CA_AIRFRAME 0
 
 param set-default CA_ROTOR_COUNT 4
-param set-default CA_ROTOR0_PX 0.1515
-param set-default CA_ROTOR0_PY 0.245
-param set-default CA_ROTOR0_KM 0.05
-param set-default CA_ROTOR1_PX -0.1515
-param set-default CA_ROTOR1_PY -0.1875
-param set-default CA_ROTOR1_KM 0.05
-param set-default CA_ROTOR2_PX 0.1515
-param set-default CA_ROTOR2_PY -0.245
-param set-default CA_ROTOR2_KM -0.05
-param set-default CA_ROTOR3_PX -0.1515
-param set-default CA_ROTOR3_PY 0.1875
-param set-default CA_ROTOR3_KM -0.05
+# Gazebo iris rotor poses are FLU; the allocator uses FRD.
+param set-default CA_ROTOR0_PX 0.13
+param set-default CA_ROTOR0_PY 0.22
+param set-default CA_ROTOR0_KM 0.06
+param set-default CA_ROTOR1_PX -0.13
+param set-default CA_ROTOR1_PY -0.2
+param set-default CA_ROTOR1_KM 0.06
+param set-default CA_ROTOR2_PX 0.13
+param set-default CA_ROTOR2_PY -0.22
+param set-default CA_ROTOR2_KM -0.06
+param set-default CA_ROTOR3_PX -0.13
+param set-default CA_ROTOR3_PY 0.2
+param set-default CA_ROTOR3_KM -0.06
+
+# omega = 100 + 1000 * signal; normalize thrust above armed idle.
+# (omega^2 - 100^2) / (1100^2 - 100^2) = 5/6*signal^2 + 1/6*signal.
+param set-default THR_MDL_FAC 0.833333333
+param set-default CA_ROTOR0_CT 7.008
+param set-default CA_ROTOR1_CT 7.008
+param set-default CA_ROTOR2_CT 7.008
+param set-default CA_ROTOR3_CT 7.008
 
 param set-default PWM_MAIN_FUNC1 101
 param set-default PWM_MAIN_FUNC2 102

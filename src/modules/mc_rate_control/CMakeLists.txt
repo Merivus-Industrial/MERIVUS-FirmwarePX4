@@ -39,9 +39,12 @@ px4_add_module(
 	SRCS
 		MulticopterRateControl.cpp
 		MulticopterRateControl.hpp
+		RateControlIntegrator.hpp
 	DEPENDS
 		circuit_breaker
 		mathlib
 		RateControl
 		px4_work_queue
 	)
+
+px4_add_unit_gtest(SRC RateControlIntegratorTest.cpp LINKLIBS RateControl)

@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "name": "settled_hover_gated_residual_velocity_006",
+  "description": "保持非阵风静默阈值，增加阵风期间的水平速度反馈以提高位移抑制余量，不修改 Z 轴。",
+  "nodes": [
+    {"id": "velocity_error", "op": "velocity_error"},
+    {"id": "velocity_feedback", "op": "velocity_gain", "input": "velocity_error", "gain": [0.20, 0.20, 0.0]},
+    {"id": "residual", "op": "acceleration_residual"},
+    {"id": "fast_residual", "op": "lowpass_acceleration", "input": "residual", "tau_s": 0.12},
+    {"id": "slow_residual", "op": "lowpass_acceleration", "input": "residual", "tau_s": 1.5},
+    {"id": "fast_compensation", "op": "acceleration_gain", "input": "fast_residual", "gain": [-0.15, -0.15, 0.0]},
+    {"id": "slow_cancellation", "op": "acceleration_gain", "input": "slow_residual", "gain": [0.15, 0.15, 0.0]},
+    {"id": "transient_compensation", "op": "add_acceleration", "left": "fast_compensation", "right": "slow_cancellation"},
+    {"id": "combined", "op": "add_acceleration", "left": "velocity_feedback", "right": "transient_compensation"},
+    {"id": "gated", "op": "velocity_gate", "left": "velocity_error", "right": "combined", "threshold_m_s": [0.08, 0.25]},
+    {"id": "bounded", "op": "limit_acceleration", "input": "gated", "limit_m_s2": [0.35, 0.35, 0.05]}
+  ],
+  "output": "bounded",
+  "maximum_correction_m_s2": 0.5
+}

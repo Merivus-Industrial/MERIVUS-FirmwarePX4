@@ -36,13 +36,16 @@ header = """
 
 
 # PX4
-git_describe_cmd = 'git describe --exclude ext/* --always --tags --dirty'
-git_tag = subprocess.check_output(git_describe_cmd.split(),
+# Only release-style tags satisfy the version contract validated below.
+release_tag_match = 'v[0-9]*.[0-9]*.[0-9]*'
+git_describe_cmd = ['git', 'describe', '--exclude', 'ext/*', '--match', release_tag_match,
+                    '--always', '--tags', '--dirty']
+git_tag = subprocess.check_output(git_describe_cmd,
                                   stderr=subprocess.STDOUT).decode('utf-8').strip()
 
 try:
     # get the tag if we're on a tagged commit
-    tag_or_branch = subprocess.check_output((git_describe_cmd+' --exact-match').split(),
+    tag_or_branch = subprocess.check_output(git_describe_cmd + ['--exact-match'],
                                             stderr=subprocess.STDOUT).decode('utf-8').strip()
 except:
     tag_or_branch = None

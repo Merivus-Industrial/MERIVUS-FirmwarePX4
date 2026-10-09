@@ -75,19 +75,25 @@ private:
 			msg.eph = gps.hdop * 100; // GPS HDOP horizontal dilution of position (unitless)
 			msg.epv = gps.vdop * 100; // GPS VDOP vertical dilution of position (unitless)
 
-			if (PX4_ISFINITE(gps.vel_m_s) && (fabsf(gps.vel_m_s) >= 0.f)) {
+			const bool horizontal_velocity_valid = (gps.vel_ne_valid || gps.vel_ned_valid)
+							&& PX4_ISFINITE(gps.vel_m_s) && gps.vel_m_s >= 0.f;
+
+			if (horizontal_velocity_valid && gps.vel_m_s * 100.f < UINT16_MAX) {
 				msg.vel = gps.vel_m_s * 100.f; // cm/s
 
 			} else {
 				msg.vel = UINT16_MAX; // If unknown, set to: UINT16_MAX
 			}
 
-			msg.cog = math::degrees(matrix::wrap_2pi(gps.cog_rad)) * 1e2f;
+			msg.cog = horizontal_velocity_valid && PX4_ISFINITE(gps.cog_rad)
+				  ? math::degrees(matrix::wrap_2pi(gps.cog_rad)) * 1e2f : UINT16_MAX;
 			msg.satellites_visible = gps.satellites_used;
 			msg.alt_ellipsoid = gps.alt_ellipsoid;
 			msg.h_acc = gps.eph * 1e3f;              // position uncertainty in mm
 			msg.v_acc = gps.epv * 1e3f;              // altitude uncertainty in mm
-			msg.vel_acc = gps.s_variance_m_s * 1e3f; // speed uncertainty in mm
+			msg.vel_acc = PX4_ISFINITE(gps.s_variance_m_s) && gps.s_variance_m_s > 0.f
+				      && static_cast<double>(gps.s_variance_m_s) * 1e3 < UINT32_MAX
+				      ? static_cast<double>(gps.s_variance_m_s) * 1e3 : 0; // no protocol sentinel for unknown accuracy
 
 			if (PX4_ISFINITE(gps.heading)) {
 				if (fabsf(gps.heading) < FLT_EPSILON) {
